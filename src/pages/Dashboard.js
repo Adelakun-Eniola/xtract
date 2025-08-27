@@ -8,7 +8,7 @@ import { getUserData, getStats } from '../services/dashboardService';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const Dashboard = () => {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState([]);   // Always initialize as []
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -21,9 +21,10 @@ const Dashboard = () => {
           getUserData(),
           getStats()
         ]);
-        
-        setData(userData.data);
-        setStats(statsData);
+
+        // ✅ Defensive assignment
+        setData(Array.isArray(userData?.data) ? userData.data : (Array.isArray(userData) ? userData : []));
+        setStats(statsData || null);
         setError('');
       } catch (err) {
         setError('Failed to load dashboard data. Please try again later.');
@@ -41,7 +42,13 @@ const Dashboard = () => {
     datasets: [
       {
         label: 'Success Rate (%)',
-        data: stats ? [stats.email_success_rate, stats.phone_success_rate, stats.address_success_rate] : [0, 0, 0],
+        data: stats
+          ? [
+              stats.email_success_rate || 0,
+              stats.phone_success_rate || 0,
+              stats.address_success_rate || 0,
+            ]
+          : [0, 0, 0],
         backgroundColor: [
           'rgba(54, 162, 235, 0.6)',
           'rgba(75, 192, 192, 0.6)',
@@ -60,25 +67,17 @@ const Dashboard = () => {
   const chartOptions = {
     responsive: true,
     plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'Data Extraction Success Rate',
-      },
+      legend: { position: 'top' },
+      title: { display: true, text: 'Data Extraction Success Rate' },
     },
     scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-      },
+      y: { beginAtZero: true, max: 100 },
     },
   };
 
   if (loading) {
     return (
-      <div className="loading-spinner">
+      <div className="loading-spinner d-flex justify-content-center align-items-center" style={{ height: "100vh" }}>
         <Spinner animation="border" role="status">
           <span className="visually-hidden">Loading...</span>
         </Spinner>
@@ -89,16 +88,16 @@ const Dashboard = () => {
   return (
     <Container className="dashboard-container">
       <h1 className="mb-4">Dashboard</h1>
-      
+
       {error && <Alert variant="danger">{error}</Alert>}
-      
+
       {stats && (
         <Row className="mb-4">
           <Col md={3}>
             <Card className="stats-card text-center">
               <Card.Body>
                 <Card.Title>Total Entries</Card.Title>
-                <Card.Text className="display-4">{stats.total_entries}</Card.Text>
+                <Card.Text className="display-4">{stats.total_entries || 0}</Card.Text>
               </Card.Body>
             </Card>
           </Col>
@@ -106,7 +105,7 @@ const Dashboard = () => {
             <Card className="stats-card text-center">
               <Card.Body>
                 <Card.Title>Emails Found</Card.Title>
-                <Card.Text className="display-4">{stats.with_email}</Card.Text>
+                <Card.Text className="display-4">{stats.with_email || 0}</Card.Text>
               </Card.Body>
             </Card>
           </Col>
@@ -114,7 +113,7 @@ const Dashboard = () => {
             <Card className="stats-card text-center">
               <Card.Body>
                 <Card.Title>Phones Found</Card.Title>
-                <Card.Text className="display-4">{stats.with_phone}</Card.Text>
+                <Card.Text className="display-4">{stats.with_phone || 0}</Card.Text>
               </Card.Body>
             </Card>
           </Col>
@@ -122,13 +121,13 @@ const Dashboard = () => {
             <Card className="stats-card text-center">
               <Card.Body>
                 <Card.Title>Addresses Found</Card.Title>
-                <Card.Text className="display-4">{stats.with_address}</Card.Text>
+                <Card.Text className="display-4">{stats.with_address || 0}</Card.Text>
               </Card.Body>
             </Card>
           </Col>
         </Row>
       )}
-      
+
       {stats && stats.total_entries > 0 && (
         <Row className="mb-4">
           <Col>
@@ -140,7 +139,7 @@ const Dashboard = () => {
           </Col>
         </Row>
       )}
-      
+
       <Row>
         <Col>
           <Card>
@@ -148,8 +147,10 @@ const Dashboard = () => {
               <h5 className="mb-0">Recent Extractions</h5>
             </Card.Header>
             <Card.Body>
-              {data.length === 0 ? (
-                <p className="text-center">No data extracted yet. Go to the Extract Data page to get started.</p>
+              {(!data || data.length === 0) ? (
+                <p className="text-center">
+                  No data extracted yet. Go to the Extract Data page to get started.
+                </p>
               ) : (
                 <Table responsive striped hover className="data-table">
                   <thead>
@@ -162,17 +163,25 @@ const Dashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.map((item) => (
-                      <tr key={item.id}>
+                    {data.map((item, idx) => (
+                      <tr key={item.id || idx}>
                         <td>{item.company_name || 'Unknown'}</td>
                         <td>{item.email || 'Not found'}</td>
                         <td>{item.phone || 'Not found'}</td>
                         <td>
-                          <a href={item.website_url} target="_blank" rel="noopener noreferrer">
-                            {item.website_url}
-                          </a>
+                          {item.website_url ? (
+                            <a href={item.website_url} target="_blank" rel="noopener noreferrer">
+                              {item.website_url}
+                            </a>
+                          ) : (
+                            'Not found'
+                          )}
                         </td>
-                        <td>{new Date(item.created_at).toLocaleDateString()}</td>
+                        <td>
+                          {item.created_at
+                            ? new Date(item.created_at).toLocaleDateString()
+                            : 'N/A'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
