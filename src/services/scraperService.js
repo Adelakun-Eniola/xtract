@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = '/api/scraper';
+const API_URL = "https://xtracter.onrender.com/api/scraper";
 
 // Extract data from a single website
 export const extractData = async (url) => {
