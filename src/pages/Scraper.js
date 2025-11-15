@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Container, Form, Button, Card, Alert, Spinner, Table } from 'react-bootstrap';
+import { Container, Form, Button, Card, Alert, Spinner, Table, Badge } from 'react-bootstrap';
 import { extractData, batchExtract } from '../services/scraperService';
 
 const Scraper = () => {
@@ -7,26 +7,46 @@ const Scraper = () => {
   const [urls, setUrls] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [results, setResults] = useState([]);
+  const [errors, setErrors] = useState([]);
   const [batchMode, setBatchMode] = useState(false);
 
   const handleSingleExtract = async (e) => {
     e.preventDefault();
     
     if (!url) {
-      setError('Please enter a website URL');
+      setError('Please enter a website URL or Google Maps search URL');
       return;
     }
     
     try {
       setLoading(true);
       setError('');
+      setSuccess('');
+      setErrors([]);
       
       const response = await extractData(url);
-      setResults([response.data]);
+      
+      // Check if it's a Google Maps search result (multiple businesses)
+      if (response.data && Array.isArray(response.data)) {
+        setResults(response.data);
+        setSuccess(response.message || `Successfully extracted ${response.data.length} business(es)`);
+        
+        // Handle errors if any
+        if (response.errors && response.errors.length > 0) {
+          setErrors(response.errors);
+        }
+      } else {
+        // Single business result
+        setResults([response.data]);
+        setSuccess(response.message || 'Data extracted successfully');
+      }
+      
       setUrl('');
     } catch (err) {
-      setError('Failed to extract data. Please check the URL and try again.');
+      const errorMsg = err.response?.data?.error || 'Failed to extract data. Please check the URL and try again.';
+      setError(errorMsg);
       console.error('Extraction error:', err);
     } finally {
       setLoading(false);
@@ -52,18 +72,21 @@ const Scraper = () => {
     try {
       setLoading(true);
       setError('');
+      setSuccess('');
+      setErrors([]);
       
       const response = await batchExtract(urlList);
-      setResults(response.results);
+      setResults(response.results || []);
       
       if (response.errors && response.errors.length > 0) {
-        setError(`${response.errors.length} URLs failed to process. Check console for details.`);
-        console.error('Batch extraction errors:', response.errors);
+        setErrors(response.errors);
       }
       
+      setSuccess(response.message || `Successfully processed ${response.results?.length || 0} URL(s)`);
       setUrls('');
     } catch (err) {
-      setError('Failed to process batch extraction. Please try again.');
+      const errorMsg = err.response?.data?.error || 'Failed to process batch extraction. Please try again.';
+      setError(errorMsg);
       console.error('Batch extraction error:', err);
     } finally {
       setLoading(false);
@@ -97,21 +120,22 @@ const Scraper = () => {
           </div>
           
           {error && <Alert variant="danger">{error}</Alert>}
+          {success && <Alert variant="success">{success}</Alert>}
           
           {!batchMode ? (
             <Form onSubmit={handleSingleExtract} className="scraper-form">
               <Form.Group className="mb-3">
-                <Form.Label>Website URL</Form.Label>
+                <Form.Label>Website URL or Google Maps Search URL</Form.Label>
                 <Form.Control
                   type="url"
-                  placeholder="https://example.com"
+                  placeholder="https://example.com or https://www.google.com/maps/search/restaurants+in+Dallas"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={loading}
                   required
                 />
                 <Form.Text className="text-muted">
-                  Enter the full URL including http:// or https://
+                  Enter a website URL or Google Maps search URL to extract multiple businesses
                 </Form.Text>
               </Form.Group>
               
@@ -176,14 +200,16 @@ const Scraper = () => {
       </Card>
       
       {results.length > 0 && (
-        <Card>
-          <Card.Header>
+        <Card className="mb-4">
+          <Card.Header className="d-flex justify-content-between align-items-center">
             <h5 className="mb-0">Extraction Results</h5>
+            <Badge bg="success">{results.length} business(es) found</Badge>
           </Card.Header>
           <Card.Body>
             <Table responsive striped hover>
               <thead>
                 <tr>
+                  <th>#</th>
                   <th>Company</th>
                   <th>Email</th>
                   <th>Phone</th>
@@ -193,16 +219,53 @@ const Scraper = () => {
               </thead>
               <tbody>
                 {results.map((result, index) => (
-                  <tr key={index}>
+                  <tr key={result.id || index}>
+                    <td>{index + 1}</td>
                     <td>{result.company_name || 'Unknown'}</td>
                     <td>{result.email || 'Not found'}</td>
                     <td>{result.phone || 'Not found'}</td>
                     <td>{result.address || 'Not found'}</td>
                     <td>
-                      <a href={result.website_url} target="_blank" rel="noopener noreferrer">
-                        {result.website_url}
+                      {result.website_url ? (
+                        <a href={result.website_url} target="_blank" rel="noopener noreferrer">
+                          View
+                        </a>
+                      ) : (
+                        'Not found'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Card.Body>
+        </Card>
+      )}
+      
+      {errors.length > 0 && (
+        <Card>
+          <Card.Header className="bg-warning">
+            <h5 className="mb-0">Errors ({errors.length})</h5>
+          </Card.Header>
+          <Card.Body>
+            <Table responsive striped>
+              <thead>
+                <tr>
+                  <th>Business</th>
+                  <th>URL</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {errors.map((err, index) => (
+                  <tr key={index}>
+                    <td>{err.business_name || 'Unknown'}</td>
+                    <td>
+                      <a href={err.url} target="_blank" rel="noopener noreferrer">
+                        {err.url}
                       </a>
                     </td>
+                    <td className="text-danger">{err.error}</td>
                   </tr>
                 ))}
               </tbody>

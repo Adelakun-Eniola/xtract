@@ -8,7 +8,7 @@ import { getUserData, getStats } from '../services/dashboardService';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const Dashboard = () => {
-  const [data, setData] = useState([]);   // Always initialize as []
+  const [data, setData] = useState([]);   
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
