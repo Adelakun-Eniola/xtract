@@ -2,6 +2,11 @@ import axios from 'axios';
 
 const API_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000') + '/api/scraper';
 
+// Debug: Log the API URL being used
+console.log('ScraperService API_URL:', API_URL);
+console.log('Environment:', process.env.NODE_ENV);
+console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
+
 // Helper function to get auth headers
 const authHeader = () => {
   const token = localStorage.getItem('token');
