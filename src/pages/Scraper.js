@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Container, Form, Button, Card, Alert, Spinner, Table, Badge } from 'react-bootstrap';
-import { extractData, batchExtract } from '../services/scraperService';
+import { Container, Form, Button, Card, Alert, Spinner, Table, Badge, ProgressBar } from 'react-bootstrap';
+import { extractData, extractDataStream, batchExtract } from '../services/scraperService';
 
 const Scraper = () => {
   const [url, setUrl] = useState('');
@@ -11,6 +11,8 @@ const Scraper = () => {
   const [results, setResults] = useState([]);
   const [errors, setErrors] = useState([]);
   const [batchMode, setBatchMode] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [statusMessage, setStatusMessage] = useState('');
 
   const handleSingleExtract = async (e) => {
     e.preventDefault();
@@ -25,31 +27,62 @@ const Scraper = () => {
       setError('');
       setSuccess('');
       setErrors([]);
+      setResults([]);
+      setProgress({ current: 0, total: 0 });
+      setStatusMessage('');
       
-      const response = await extractData(url);
+      // Check if it's a Google Maps URL - use streaming
+      const isGoogleMaps = url.includes('google.com/maps/search');
       
-      // Check if it's a Google Maps search result (multiple businesses)
-      if (response.data && Array.isArray(response.data)) {
-        setResults(response.data);
-        setSuccess(response.message || `Successfully extracted ${response.data.length} business(es)`);
+      if (isGoogleMaps) {
+        // Use streaming for Google Maps
+        setStatusMessage('Connecting to scraper...');
         
-        // Handle errors if any
-        if (response.errors && response.errors.length > 0) {
-          setErrors(response.errors);
-        }
+        await extractDataStream(url, (event) => {
+          if (event.type === 'status') {
+            setStatusMessage(event.message);
+            if (event.total) {
+              setProgress({ current: 0, total: event.total });
+            }
+          } else if (event.type === 'result') {
+            // Add result immediately as it comes in
+            setResults(prev => [...prev, event.data]);
+            setProgress(event.progress);
+            setStatusMessage(`Scraped ${event.progress.current} of ${event.progress.total} businesses...`);
+          } else if (event.type === 'error') {
+            setErrors(prev => [...prev, event.error]);
+          } else if (event.type === 'complete') {
+            setSuccess(`Successfully extracted ${event.results.length} business(es)`);
+            setStatusMessage('');
+            setLoading(false);
+          }
+        });
+        
       } else {
-        // Single business result
-        setResults([response.data]);
-        setSuccess(response.message || 'Data extracted successfully');
+        // Use regular extraction for single websites
+        const response = await extractData(url);
+        
+        if (response.data && Array.isArray(response.data)) {
+          setResults(response.data);
+          setSuccess(response.message || `Successfully extracted ${response.data.length} business(es)`);
+          
+          if (response.errors && response.errors.length > 0) {
+            setErrors(response.errors);
+          }
+        } else {
+          setResults([response.data]);
+          setSuccess(response.message || 'Data extracted successfully');
+        }
       }
       
       setUrl('');
     } catch (err) {
-      const errorMsg = err.response?.data?.error || 'Failed to extract data. Please check the URL and try again.';
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to extract data. Please check the URL and try again.';
       setError(errorMsg);
       console.error('Extraction error:', err);
     } finally {
       setLoading(false);
+      setStatusMessage('');
     }
   };
 
@@ -121,6 +154,22 @@ const Scraper = () => {
           
           {error && <Alert variant="danger">{error}</Alert>}
           {success && <Alert variant="success">{success}</Alert>}
+          
+          {loading && statusMessage && (
+            <Alert variant="info">
+              <div className="d-flex align-items-center">
+                <Spinner animation="border" size="sm" className="me-2" />
+                <span>{statusMessage}</span>
+              </div>
+              {progress.total > 0 && (
+                <ProgressBar 
+                  now={(progress.current / progress.total) * 100} 
+                  label={`${progress.current}/${progress.total}`}
+                  className="mt-2"
+                />
+              )}
+            </Alert>
+          )}
           
           {!batchMode ? (
             <Form onSubmit={handleSingleExtract} className="scraper-form">
