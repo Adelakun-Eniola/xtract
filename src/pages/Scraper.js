@@ -266,8 +266,8 @@ const Scraper = () => {
       {results.length > 0 && (
         <Card className="mb-4">
           <Card.Header className="d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">Extraction Results</h5>
-            <Badge bg="success">{results.length} business(es) found</Badge>
+            <h5 className="mb-0">✅ Successfully Extracted {results.length} Business{results.length !== 1 ? 'es' : ''}</h5>
+            <Badge bg="success">{results.length} results</Badge>
           </Card.Header>
           <Card.Body>
             <Table responsive striped hover>
@@ -306,36 +306,10 @@ const Scraper = () => {
         </Card>
       )}
       
-      {errors.length > 0 && (
-        <Card>
-          <Card.Header className="bg-warning">
-            <h5 className="mb-0">Errors ({errors.length})</h5>
-          </Card.Header>
-          <Card.Body>
-            <Table responsive striped>
-              <thead>
-                <tr>
-                  <th>Business</th>
-                  <th>URL</th>
-                  <th>Error</th>
-                </tr>
-              </thead>
-              <tbody>
-                {errors.map((err, index) => (
-                  <tr key={index}>
-                    <td>{err.business_name || 'Unknown'}</td>
-                    <td>
-                      <a href={err.url} target="_blank" rel="noopener noreferrer">
-                        {err.url}
-                      </a>
-                    </td>
-                    <td className="text-danger">{err.error}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card.Body>
-        </Card>
+      {errors.length > 0 && results.length === 0 && (
+        <Alert variant="warning">
+          <strong>No results found.</strong> The scraper couldn't extract data from the businesses. This might be because they don't have websites listed on Google Maps.
+        </Alert>
       )}
     </Container>
   );
