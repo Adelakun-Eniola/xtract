@@ -116,6 +116,20 @@ export const extractDataStream = async (url, onProgress) => {
   }
 };
 
+// Search for businesses in Google Maps (returns list without scraping details)
+export const searchBusinesses = async (url) => {
+  if (!/^https?:\/\//i.test(url)) {
+    url = "https://" + url;
+  }
+  try {
+    const response = await axios.post(`${API_URL}/search-businesses`, { url }, authHeader());
+    return response.data;
+  } catch (error) {
+    console.error('Business search error:', error);
+    throw error;
+  }
+};
+
 // Extract data from multiple websites
 export const batchExtract = async (urls) => {
   try {

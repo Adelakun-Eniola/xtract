@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Container, Form, Button, Card, Alert, Spinner, Table, Badge, ProgressBar } from 'react-bootstrap';
-import { extractData, extractDataStream, batchExtract } from '../services/scraperService';
+import { Container, Form, Button, Card, Alert, Spinner, Table, Badge, ProgressBar, ListGroup } from 'react-bootstrap';
+import { extractData, extractDataStream, batchExtract, searchBusinesses } from '../services/scraperService';
 
 const Scraper = () => {
   const [url, setUrl] = useState('');
@@ -13,6 +13,44 @@ const Scraper = () => {
   const [batchMode, setBatchMode] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [statusMessage, setStatusMessage] = useState('');
+  const [businesses, setBusinesses] = useState([]);
+  const [showBusinessList, setShowBusinessList] = useState(false);
+
+  const handleSearchBusinesses = async (e) => {
+    e.preventDefault();
+    
+    if (!url) {
+      setError('Please enter a Google Maps search URL');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      setBusinesses([]);
+      setShowBusinessList(false);
+      setStatusMessage('Searching for businesses...');
+      
+      const response = await searchBusinesses(url);
+      
+      if (response.businesses && response.businesses.length > 0) {
+        setBusinesses(response.businesses);
+        setShowBusinessList(true);
+        setSuccess(response.message || `Found ${response.count} businesses`);
+      } else {
+        setError('No businesses found in this search');
+      }
+      
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to search businesses. Please check the URL and try again.';
+      setError(errorMsg);
+      console.error('Search error:', err);
+    } finally {
+      setLoading(false);
+      setStatusMessage('');
+    }
+  };
 
   const handleSingleExtract = async (e) => {
     e.preventDefault();
@@ -147,25 +185,7 @@ const Scraper = () => {
       
       <Card className="mb-4">
         <Card.Body>
-          <div className="mb-3">
-            <Form.Check
-              type="radio"
-              label="Single Website"
-              name="extractMode"
-              id="singleMode"
-              checked={!batchMode}
-              onChange={() => setBatchMode(false)}
-              className="mb-2"
-            />
-            <Form.Check
-              type="radio"
-              label="Multiple Websites (Batch Mode)"
-              name="extractMode"
-              id="batchMode"
-              checked={batchMode}
-              onChange={() => setBatchMode(true)}
-            />
-          </div>
+          <h5 className="mb-3">Step 1: Find Businesses</h5>
           
           {error && <Alert variant="danger">{error}</Alert>}
           {success && <Alert variant="success">{success}</Alert>}
@@ -176,92 +196,70 @@ const Scraper = () => {
                 <Spinner animation="border" size="sm" className="me-2" />
                 <span>{statusMessage}</span>
               </div>
-              {progress.total > 0 && (
-                <ProgressBar 
-                  now={(progress.current / progress.total) * 100} 
-                  label={`${progress.current}/${progress.total}`}
-                  className="mt-2"
-                />
-              )}
             </Alert>
           )}
           
-          {!batchMode ? (
-            <Form onSubmit={handleSingleExtract} className="scraper-form">
-              <Form.Group className="mb-3">
-                <Form.Label>Website URL or Google Maps Search URL</Form.Label>
-                <Form.Control
-                  type="url"
-                  placeholder="https://example.com or https://www.google.com/maps/search/restaurants+in+Dallas"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  disabled={loading}
-                  required
-                />
-                <Form.Text className="text-muted">
-                  Enter a website URL or Google Maps search URL to extract multiple businesses
-                </Form.Text>
-              </Form.Group>
-              
-              <Button 
-                variant="primary" 
-                type="submit" 
+          <Form onSubmit={handleSearchBusinesses} className="scraper-form">
+            <Form.Group className="mb-3">
+              <Form.Label>Google Maps Search URL</Form.Label>
+              <Form.Control
+                type="url"
+                placeholder="https://www.google.com/maps/search/insurance+companies+in+texas/@31.42169,-99.1707502,8z"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
                 disabled={loading}
-                className="d-flex align-items-center"
-              >
-                {loading && (
-                  <Spinner
-                    as="span"
-                    animation="border"
-                    size="sm"
-                    role="status"
-                    aria-hidden="true"
-                    className="me-2"
-                  />
-                )}
-                Extract Data
-              </Button>
-            </Form>
-          ) : (
-            <Form onSubmit={handleBatchExtract} className="scraper-form">
-              <Form.Group className="mb-3">
-                <Form.Label>Website URLs (One per line)</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={5}
-                  placeholder="https://example1.com&#10;https://example2.com&#10;https://example3.com"
-                  value={urls}
-                  onChange={(e) => setUrls(e.target.value)}
-                  disabled={loading}
-                  required
+                required
+              />
+              <Form.Text className="text-muted">
+                Paste your Google Maps search URL to find all available businesses
+              </Form.Text>
+            </Form.Group>
+            
+            <Button 
+              variant="primary" 
+              type="submit" 
+              disabled={loading}
+              className="d-flex align-items-center"
+            >
+              {loading && (
+                <Spinner
+                  as="span"
+                  animation="border"
+                  size="sm"
+                  role="status"
+                  aria-hidden="true"
+                  className="me-2"
                 />
-                <Form.Text className="text-muted">
-                  Enter each URL on a new line. Include http:// or https://
-                </Form.Text>
-              </Form.Group>
-              
-              <Button 
-                variant="primary" 
-                type="submit" 
-                disabled={loading}
-                className="d-flex align-items-center"
-              >
-                {loading && (
-                  <Spinner
-                    as="span"
-                    animation="border"
-                    size="sm"
-                    role="status"
-                    aria-hidden="true"
-                    className="me-2"
-                  />
-                )}
-                Extract Data
-              </Button>
-            </Form>
-          )}
+              )}
+              Search Businesses
+            </Button>
+          </Form>
         </Card.Body>
       </Card>
+      
+      {showBusinessList && businesses.length > 0 && (
+        <Card className="mb-4">
+          <Card.Header className="d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">Found {businesses.length} Businesses</h5>
+            <Badge bg="success">{businesses.length} results</Badge>
+          </Card.Header>
+          <Card.Body>
+            <ListGroup>
+              {businesses.map((business, index) => (
+                <ListGroup.Item key={index} className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>#{business.index}</strong>
+                    <div className="text-muted small">{business.url}</div>
+                  </div>
+                  <a href={business.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-primary">
+                    View
+                  </a>
+                </ListGroup.Item>
+              ))}
+            </ListGroup>
+          </Card.Body>
+        </Card>
+      )}
       
       {results.length > 0 && (
         <Card className="mb-4">
