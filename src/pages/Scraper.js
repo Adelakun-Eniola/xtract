@@ -31,14 +31,15 @@ const Scraper = () => {
       setProgress({ current: 0, total: 0 });
       setStatusMessage('');
       
-      // Check if it's a Google Maps URL - use streaming
+      // Check if it's a Google Maps URL - try streaming, fallback to regular
       const isGoogleMaps = url.includes('google.com/maps/search');
       
       if (isGoogleMaps) {
-        // Use streaming for Google Maps
+        // Try streaming for Google Maps
         setStatusMessage('Connecting to scraper...');
         
-        await extractDataStream(url, (event) => {
+        try {
+          await extractDataStream(url, (event) => {
           if (event.type === 'status') {
             setStatusMessage(event.message);
             if (event.total) {
@@ -56,7 +57,21 @@ const Scraper = () => {
             setStatusMessage('');
             setLoading(false);
           }
-        });
+          });
+        } catch (streamError) {
+          // Fallback to regular extraction if streaming fails
+          console.log('Streaming failed, falling back to regular extraction:', streamError);
+          setStatusMessage('Using standard extraction...');
+          
+          const response = await extractData(url);
+          if (response.data && Array.isArray(response.data)) {
+            setResults(response.data);
+            setSuccess(response.message || `Successfully extracted ${response.data.length} business(es)`);
+            if (response.errors && response.errors.length > 0) {
+              setErrors(response.errors);
+            }
+          }
+        }
         
       } else {
         // Use regular extraction for single websites
