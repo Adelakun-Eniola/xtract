@@ -247,11 +247,16 @@ const Scraper = () => {
             <ListGroup>
               {businesses.map((business, index) => (
                 <ListGroup.Item key={index} className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>#{business.index}</strong>
-                    <div className="text-muted small">{business.url}</div>
+                  <div className="flex-grow-1">
+                    <div className="d-flex align-items-center mb-1">
+                      <Badge bg="secondary" className="me-2">#{business.index}</Badge>
+                      <strong>{business.name || 'Unknown Business'}</strong>
+                    </div>
+                    <div className="text-muted small text-truncate" style={{maxWidth: '600px'}}>
+                      {business.url}
+                    </div>
                   </div>
-                  <a href={business.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-primary">
+                  <a href={business.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-primary ms-2">
                     View
                   </a>
                 </ListGroup.Item>
