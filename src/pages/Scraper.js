@@ -36,6 +36,8 @@ const Scraper = () => {
       // Use streaming for phone extraction
       if (includePhone) {
         await searchBusinessesStream(url, (event) => {
+          console.log('Frontend received event:', event.type, event);
+          
           if (event.type === 'status') {
             setStatusMessage(event.message);
             if (event.total) {
@@ -44,7 +46,12 @@ const Scraper = () => {
             }
           } else if (event.type === 'business') {
             // Add business immediately as it comes in
-            setBusinesses(prev => [...prev, event.data]);
+            console.log('Adding business to list:', event.data);
+            setBusinesses(prev => {
+              const updated = [...prev, event.data];
+              console.log('Updated businesses list length:', updated.length);
+              return updated;
+            });
             setProgress(event.progress);
             setStatusMessage(`Extracted ${event.progress.current} of ${event.progress.total} businesses...`);
           } else if (event.type === 'complete') {

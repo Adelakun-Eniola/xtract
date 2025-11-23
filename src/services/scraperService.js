@@ -169,9 +169,14 @@ export const searchBusinessesStream = async (url, onProgress) => {
       
       for (const line of lines) {
         if (line.startsWith('data: ')) {
-          const data = JSON.parse(line.slice(6));
-          if (onProgress) {
-            onProgress(data);
+          try {
+            const data = JSON.parse(line.slice(6));
+            console.log('SSE event received:', data.type, data);
+            if (onProgress) {
+              onProgress(data);
+            }
+          } catch (parseError) {
+            console.error('Error parsing SSE data:', line, parseError);
           }
         }
       }
