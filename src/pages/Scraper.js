@@ -47,6 +47,8 @@ const Scraper = () => {
           } else if (event.type === 'business') {
             // Add business immediately as it comes in
             console.log('Adding business to list:', event.data);
+            console.log('Has address?', event.data.address);
+            console.log('Has phone?', event.data.phone);
             setBusinesses(prev => {
               const updated = [...prev, event.data];
               console.log('Updated businesses list length:', updated.length);
@@ -312,6 +314,18 @@ const Scraper = () => {
                       <div className="text-success mb-1">
                         <span className="me-1">📞</span>
                         <strong>{business.phone}</strong>
+                      </div>
+                    )}
+                    {business.address && business.address !== 'N/A' && (
+                      <div className="text-primary mb-1">
+                        <span className="me-1">📍</span>
+                        <span>{business.address}</span>
+                      </div>
+                    )}
+                    {/* Debug: Show address value */}
+                    {business.address && (
+                      <div className="text-muted small">
+                        Address value: "{business.address}"
                       </div>
                     )}
                     <div className="text-muted small text-truncate" style={{maxWidth: '600px'}}>
