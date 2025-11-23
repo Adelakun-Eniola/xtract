@@ -122,10 +122,63 @@ export const searchBusinesses = async (url, includePhone = false) => {
     url = "https://" + url;
   }
   try {
-    const response = await axios.post(`${API_URL}/search-businesses`, { url, include_phone: includePhone }, authHeader());
+    const response = await axios.post(`${API_URL}/search-businesses`, { 
+      url, 
+      include_phone: includePhone,
+      stream: false
+    }, authHeader());
     return response.data;
   } catch (error) {
     console.error('Business search error:', error);
+    throw error;
+  }
+};
+
+// Search for businesses with streaming (for phone extraction)
+export const searchBusinessesStream = async (url, onProgress) => {
+  if (!/^https?:\/\//i.test(url)) {
+    url = "https://" + url;
+  }
+  
+  const token = localStorage.getItem('token');
+  const apiUrl = `${API_URL}/search-businesses`;
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+      },
+      body: JSON.stringify({ url, include_phone: true, stream: true })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = JSON.parse(line.slice(6));
+          if (onProgress) {
+            onProgress(data);
+          }
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error('Streaming search error:', error);
     throw error;
   }
 };

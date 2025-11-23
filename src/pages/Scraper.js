@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Form, Button, Card, Alert, Spinner, Table, Badge, ProgressBar, ListGroup } from 'react-bootstrap';
-import { extractData, extractDataStream, batchExtract, searchBusinesses } from '../services/scraperService';
+import { extractData, extractDataStream, batchExtract, searchBusinesses, searchBusinessesStream } from '../services/scraperService';
 
 const Scraper = () => {
   const [url, setUrl] = useState('');
@@ -30,16 +30,43 @@ const Scraper = () => {
       setSuccess('');
       setBusinesses([]);
       setShowBusinessList(false);
+      setProgress({ current: 0, total: 0 });
       setStatusMessage(includePhone ? 'Searching for businesses and extracting phone numbers...' : 'Searching for businesses...');
       
-      const response = await searchBusinesses(url, includePhone);
-      
-      if (response.businesses && response.businesses.length > 0) {
-        setBusinesses(response.businesses);
-        setShowBusinessList(true);
-        setSuccess(response.message || `Found ${response.count} businesses`);
+      // Use streaming for phone extraction
+      if (includePhone) {
+        await searchBusinessesStream(url, (event) => {
+          if (event.type === 'status') {
+            setStatusMessage(event.message);
+            if (event.total) {
+              setProgress({ current: 0, total: event.total });
+              setShowBusinessList(true);
+            }
+          } else if (event.type === 'business') {
+            // Add business immediately as it comes in
+            setBusinesses(prev => [...prev, event.data]);
+            setProgress(event.progress);
+            setStatusMessage(`Extracted ${event.progress.current} of ${event.progress.total} businesses...`);
+          } else if (event.type === 'complete') {
+            setSuccess(event.message || `Found ${event.total} businesses`);
+            setStatusMessage('');
+            setLoading(false);
+          } else if (event.type === 'error') {
+            setError(event.error);
+            setLoading(false);
+          }
+        });
       } else {
-        setError('No businesses found in this search');
+        // Regular search without phones
+        const response = await searchBusinesses(url, false);
+        
+        if (response.businesses && response.businesses.length > 0) {
+          setBusinesses(response.businesses);
+          setShowBusinessList(true);
+          setSuccess(response.message || `Found ${response.count} businesses`);
+        } else {
+          setError('No businesses found in this search');
+        }
       }
       
     } catch (err) {
@@ -240,6 +267,7 @@ const Scraper = () => {
                 onClick={(e) => handleSearchBusinesses(e, true)}
                 disabled={loading}
                 className="d-flex align-items-center"
+                title="Extracts phone numbers for all businesses (shows results in real-time)"
               >
                 {loading && (
                   <Spinner
@@ -251,7 +279,7 @@ const Scraper = () => {
                     className="me-2"
                   />
                 )}
-                Search with Phone Numbers
+                Get Phone Numbers (All)
               </Button>
             </div>
           </Form>
@@ -275,7 +303,7 @@ const Scraper = () => {
                     </div>
                     {business.phone && (
                       <div className="text-success mb-1">
-                        <i className="bi bi-telephone-fill me-1"></i>
+                        <span className="me-1">📞</span>
                         <strong>{business.phone}</strong>
                       </div>
                     )}
