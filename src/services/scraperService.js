@@ -117,12 +117,12 @@ export const extractDataStream = async (url, onProgress) => {
 };
 
 // Search for businesses in Google Maps (returns list without scraping details)
-export const searchBusinesses = async (url) => {
+export const searchBusinesses = async (url, includePhone = false) => {
   if (!/^https?:\/\//i.test(url)) {
     url = "https://" + url;
   }
   try {
-    const response = await axios.post(`${API_URL}/search-businesses`, { url }, authHeader());
+    const response = await axios.post(`${API_URL}/search-businesses`, { url, include_phone: includePhone }, authHeader());
     return response.data;
   } catch (error) {
     console.error('Business search error:', error);

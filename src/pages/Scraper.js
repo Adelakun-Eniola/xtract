@@ -16,7 +16,7 @@ const Scraper = () => {
   const [businesses, setBusinesses] = useState([]);
   const [showBusinessList, setShowBusinessList] = useState(false);
 
-  const handleSearchBusinesses = async (e) => {
+  const handleSearchBusinesses = async (e, includePhone = false) => {
     e.preventDefault();
     
     if (!url) {
@@ -30,9 +30,9 @@ const Scraper = () => {
       setSuccess('');
       setBusinesses([]);
       setShowBusinessList(false);
-      setStatusMessage('Searching for businesses...');
+      setStatusMessage(includePhone ? 'Searching for businesses and extracting phone numbers...' : 'Searching for businesses...');
       
-      const response = await searchBusinesses(url);
+      const response = await searchBusinesses(url, includePhone);
       
       if (response.businesses && response.businesses.length > 0) {
         setBusinesses(response.businesses);
@@ -215,24 +215,45 @@ const Scraper = () => {
               </Form.Text>
             </Form.Group>
             
-            <Button 
-              variant="primary" 
-              type="submit" 
-              disabled={loading}
-              className="d-flex align-items-center"
-            >
-              {loading && (
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
-                  role="status"
-                  aria-hidden="true"
-                  className="me-2"
-                />
-              )}
-              Search Businesses
-            </Button>
+            <div className="d-flex gap-2">
+              <Button 
+                variant="primary" 
+                type="submit" 
+                disabled={loading}
+                className="d-flex align-items-center"
+              >
+                {loading && (
+                  <Spinner
+                    as="span"
+                    animation="border"
+                    size="sm"
+                    role="status"
+                    aria-hidden="true"
+                    className="me-2"
+                  />
+                )}
+                Search Businesses
+              </Button>
+              
+              <Button 
+                variant="success" 
+                onClick={(e) => handleSearchBusinesses(e, true)}
+                disabled={loading}
+                className="d-flex align-items-center"
+              >
+                {loading && (
+                  <Spinner
+                    as="span"
+                    animation="border"
+                    size="sm"
+                    role="status"
+                    aria-hidden="true"
+                    className="me-2"
+                  />
+                )}
+                Search with Phone Numbers
+              </Button>
+            </div>
           </Form>
         </Card.Body>
       </Card>
@@ -252,6 +273,12 @@ const Scraper = () => {
                       <Badge bg="secondary" className="me-2">#{business.index}</Badge>
                       <strong>{business.name || 'Unknown Business'}</strong>
                     </div>
+                    {business.phone && (
+                      <div className="text-success mb-1">
+                        <i className="bi bi-telephone-fill me-1"></i>
+                        <strong>{business.phone}</strong>
+                      </div>
+                    )}
                     <div className="text-muted small text-truncate" style={{maxWidth: '600px'}}>
                       {business.url}
                     </div>
