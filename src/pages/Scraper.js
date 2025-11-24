@@ -31,7 +31,7 @@ const Scraper = () => {
       setBusinesses([]);
       setShowBusinessList(false);
       setProgress({ current: 0, total: 0 });
-      setStatusMessage('Searching for businesses and extracting addresses & phone numbers...');
+      setStatusMessage('Searching for businesses and extracting phone numbers, addresses & websites...');
       
       await searchAddressesStream(url, (event) => {
         console.log('Frontend received address event:', event.type, event);
@@ -340,7 +340,7 @@ const Scraper = () => {
                 onClick={handleSearchAddresses}
                 disabled={loading}
                 className="d-flex align-items-center"
-                title="Extracts addresses and phone numbers for all businesses (shows results in real-time)"
+                title="Extracts phone numbers, addresses, and websites for all businesses (shows results in real-time)"
               >
                 {loading && (
                   <Spinner
@@ -352,7 +352,7 @@ const Scraper = () => {
                     className="me-2"
                   />
                 )}
-                Get Addresses & Phones (All)
+                Get All Details (Phone, Address, Website)
               </Button>
             </div>
           </Form>
@@ -384,6 +384,14 @@ const Scraper = () => {
                       <div className="text-info mb-1">
                         <span className="me-1">📍</span>
                         <strong>{business.address}</strong>
+                      </div>
+                    )}
+                    {business.website && business.website !== 'N/A' && (
+                      <div className="text-primary mb-1">
+                        <span className="me-1">🌐</span>
+                        <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
+                          <strong>{business.website}</strong>
+                        </a>
                       </div>
                     )}
                     <div className="text-muted small text-truncate" style={{maxWidth: '600px'}}>
