@@ -188,6 +188,60 @@ export const searchBusinessesStream = async (url, onProgress) => {
   }
 };
 
+// Search for businesses with addresses (streaming)
+export const searchAddressesStream = async (url, onProgress) => {
+  if (!/^https?:\/\//i.test(url)) {
+    url = "https://" + url;
+  }
+  
+  const token = localStorage.getItem('token');
+  const apiUrl = `${API_URL}/search-addresses`;
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+      },
+      body: JSON.stringify({ url, stream: true })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            console.log('Address SSE event received:', data.type, data);
+            if (onProgress) {
+              onProgress(data);
+            }
+          } catch (parseError) {
+            console.error('Error parsing address SSE data:', line, parseError);
+          }
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error('Streaming address search error:', error);
+    throw error;
+  }
+};
+
 // Extract data from multiple websites
 export const batchExtract = async (urls) => {
   try {

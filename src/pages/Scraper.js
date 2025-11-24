@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Form, Button, Card, Alert, Spinner, Table, Badge, ProgressBar, ListGroup } from 'react-bootstrap';
-import { extractData, extractDataStream, batchExtract, searchBusinesses, searchBusinessesStream } from '../services/scraperService';
+import { extractData, extractDataStream, batchExtract, searchBusinesses, searchBusinessesStream, searchAddressesStream } from '../services/scraperService';
 
 const Scraper = () => {
   const [url, setUrl] = useState('');
@@ -15,6 +15,57 @@ const Scraper = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [businesses, setBusinesses] = useState([]);
   const [showBusinessList, setShowBusinessList] = useState(false);
+
+  const handleSearchAddresses = async (e) => {
+    e.preventDefault();
+    
+    if (!url) {
+      setError('Please enter a Google Maps search URL');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      setBusinesses([]);
+      setShowBusinessList(false);
+      setProgress({ current: 0, total: 0 });
+      setStatusMessage('Searching for businesses and extracting addresses...');
+      
+      await searchAddressesStream(url, (event) => {
+        console.log('Frontend received address event:', event.type, event);
+        
+        if (event.type === 'status') {
+          setStatusMessage(event.message);
+          if (event.total) {
+            setProgress({ current: 0, total: event.total });
+            setShowBusinessList(true);
+          }
+        } else if (event.type === 'business') {
+          // Add business immediately as it comes in
+          setBusinesses(prev => [...prev, event.data]);
+          setProgress(event.progress);
+          setStatusMessage(`Extracted ${event.progress.current} of ${event.progress.total} businesses...`);
+        } else if (event.type === 'complete') {
+          setSuccess(event.message || `Found ${event.total} businesses`);
+          setStatusMessage('');
+          setLoading(false);
+        } else if (event.type === 'error') {
+          setError(event.error);
+          setLoading(false);
+        }
+      });
+      
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to search addresses. Please check the URL and try again.';
+      setError(errorMsg);
+      console.error('Address search error:', err);
+    } finally {
+      setLoading(false);
+      setStatusMessage('');
+    }
+  };
 
   const handleSearchBusinesses = async (e, includePhone = false) => {
     e.preventDefault();
@@ -283,6 +334,26 @@ const Scraper = () => {
                 )}
                 Get Phone Numbers (All)
               </Button>
+              
+              <Button 
+                variant="info" 
+                onClick={handleSearchAddresses}
+                disabled={loading}
+                className="d-flex align-items-center"
+                title="Extracts addresses for all businesses (shows results in real-time)"
+              >
+                {loading && (
+                  <Spinner
+                    as="span"
+                    animation="border"
+                    size="sm"
+                    role="status"
+                    aria-hidden="true"
+                    className="me-2"
+                  />
+                )}
+                Get Addresses (All)
+              </Button>
             </div>
           </Form>
         </Card.Body>
@@ -307,6 +378,12 @@ const Scraper = () => {
                       <div className="text-success mb-1">
                         <span className="me-1">📞</span>
                         <strong>{business.phone}</strong>
+                      </div>
+                    )}
+                    {business.address && (
+                      <div className="text-info mb-1">
+                        <span className="me-1">📍</span>
+                        <strong>{business.address}</strong>
                       </div>
                     )}
                     <div className="text-muted small text-truncate" style={{maxWidth: '600px'}}>
