@@ -31,7 +31,7 @@ const Scraper = () => {
       setBusinesses([]);
       setShowBusinessList(false);
       setProgress({ current: 0, total: 0 });
-      setStatusMessage('Searching for businesses and extracting addresses...');
+      setStatusMessage('Searching for businesses and extracting addresses & phone numbers...');
       
       await searchAddressesStream(url, (event) => {
         console.log('Frontend received address event:', event.type, event);
@@ -340,7 +340,7 @@ const Scraper = () => {
                 onClick={handleSearchAddresses}
                 disabled={loading}
                 className="d-flex align-items-center"
-                title="Extracts addresses for all businesses (shows results in real-time)"
+                title="Extracts addresses and phone numbers for all businesses (shows results in real-time)"
               >
                 {loading && (
                   <Spinner
@@ -352,7 +352,7 @@ const Scraper = () => {
                     className="me-2"
                   />
                 )}
-                Get Addresses (All)
+                Get Addresses & Phones (All)
               </Button>
             </div>
           </Form>

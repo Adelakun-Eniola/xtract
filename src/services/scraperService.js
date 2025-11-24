@@ -252,3 +252,4 @@ export const batchExtract = async (urls) => {
     throw error;
   }
 };
+  // "url": "https://www.google.com/maps/search/pizza+near+manhattan"
