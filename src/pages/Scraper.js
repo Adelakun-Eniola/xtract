@@ -31,7 +31,7 @@ const Scraper = () => {
       setBusinesses([]);
       setShowBusinessList(false);
       setProgress({ current: 0, total: 0 });
-      setStatusMessage('Searching for businesses and extracting phone numbers, addresses & websites...');
+      setStatusMessage('Searching for businesses and extracting phone numbers, addresses, websites & emails...');
       
       await searchAddressesStream(url, (event) => {
         console.log('Frontend received address event:', event.type, event);
@@ -340,7 +340,7 @@ const Scraper = () => {
                 onClick={handleSearchAddresses}
                 disabled={loading}
                 className="d-flex align-items-center"
-                title="Extracts phone numbers, addresses, and websites for all businesses (shows results in real-time)"
+                title="Extracts phone numbers, addresses, websites, and emails for all businesses (shows results in real-time)"
               >
                 {loading && (
                   <Spinner
@@ -352,7 +352,7 @@ const Scraper = () => {
                     className="me-2"
                   />
                 )}
-                Get All Details (Phone, Address, Website)
+                Get Complete Details (Phone, Address, Website, Email)
               </Button>
             </div>
           </Form>
@@ -391,6 +391,14 @@ const Scraper = () => {
                         <span className="me-1">🌐</span>
                         <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
                           <strong>{business.website}</strong>
+                        </a>
+                      </div>
+                    )}
+                    {business.email && business.email !== 'N/A' && (
+                      <div className="text-warning mb-1">
+                        <span className="me-1">📧</span>
+                        <a href={`mailto:${business.email}`} className="text-decoration-none">
+                          <strong>{business.email}</strong>
                         </a>
                       </div>
                     )}
