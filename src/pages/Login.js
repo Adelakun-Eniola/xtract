@@ -5,6 +5,7 @@ import { googleLogin } from '../services/authService';
 
 const Login = ({ setIsAuthenticated, setUser }) => {
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Only clear authentication-related data, preserve dashboard data
@@ -15,26 +16,63 @@ const Login = ({ setIsAuthenticated, setUser }) => {
   }, []);
 
   const handleGoogleSuccess = async (credentialResponse) => {
-  try {
-    const freshToken = credentialResponse.credential;
-    console.log('Fresh Google Token received at:', new Date().toISOString());
-    console.log('Token (first 100 chars):', freshToken.substring(0, 100) + '...');
-    const userData = await googleLogin(freshToken);
-    if (userData) {
-      setUser(userData);
-      setIsAuthenticated(true);
-      console.log('Login successful at:', new Date().toISOString());
+    try {
+      console.log('=== Google Login Process Started ===');
+      console.log('Credential response:', credentialResponse);
+      
+      if (!credentialResponse || !credentialResponse.credential) {
+        throw new Error('No credential received from Google');
+      }
+      
+      const freshToken = credentialResponse.credential;
+      console.log('Fresh Google Token received at:', new Date().toISOString());
+      console.log('Token (first 100 chars):', freshToken.substring(0, 100) + '...');
+      
+      setError(''); // Clear any previous errors
+      console.log('Calling backend API...');
+      
+      const userData = await googleLogin(freshToken);
+      console.log('Backend response:', userData);
+      
+      if (userData) {
+        console.log('Setting user data and authentication...');
+        setUser(userData);
+        setIsAuthenticated(true);
+        console.log('Login successful at:', new Date().toISOString());
+        console.log('=== Login Process Complete ===');
+      } else {
+        throw new Error('No user data received from backend');
+      }
+    } catch (err) {
+      console.error('=== Google Login Error ===');
+      console.error('Error details:', err);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      console.error('Error timestamp:', new Date().toISOString());
+      
+      const errorMessage = err.response?.data?.error || err.message || 'Unknown login error';
+      setError('Failed to login with Google: ' + errorMessage);
     }
-  } catch (err) {
-    setError('Failed to login with Google: ' + err.message);
-    console.error('Google login error:', err);
-    console.error('Error timestamp:', new Date().toISOString());
-  }
-};
+  };
 
-  const handleGoogleError = () => {
-    setError('Google login failed. Please try again.');
-    console.error('Google login failed');
+  const handleGoogleError = (error) => {
+    console.error('=== Google Login Error ===');
+    console.error('Error details:', error);
+    
+    let errorMessage = 'Google login failed. Please try again.';
+    
+    if (error && typeof error === 'object') {
+      if (error.error === 'popup_blocked_by_browser') {
+        errorMessage = 'Popup was blocked by browser. Please allow popups and try again.';
+      } else if (error.error === 'access_denied') {
+        errorMessage = 'Access denied. Please grant permission to continue.';
+      } else if (error.error === 'popup_closed_by_user') {
+        errorMessage = 'Login was cancelled. Please try again.';
+      }
+    }
+    
+    setError(errorMessage);
+    console.error('Google login failed:', errorMessage);
   };
 
   return (
@@ -56,7 +94,20 @@ const Login = ({ setIsAuthenticated, setUser }) => {
                 text="signin_with"
                 shape="rectangular"
                 size="large"
+                auto_select={false}
+                cancel_on_tap_outside={true}
+                type="standard"
+                width="350"
+                locale="en"
               />
+              
+              {error && error.includes('popup') && (
+                <div className="mt-2">
+                  <small className="text-muted">
+                    Having trouble? Try disabling popup blockers or use an incognito window.
+                  </small>
+                </div>
+              )}
             </div>
           </Card.Body>
         </Card>

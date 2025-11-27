@@ -5,17 +5,27 @@ const API_URL = process.env.REACT_APP_API_URL + '/api/auth';
 // Handle Google authentication
 export const googleLogin = async (tokenId) => {
   try {
+    console.log('AuthService: Making API call to:', `${API_URL}/google`);
+    console.log('AuthService: Sending token (first 50 chars):', tokenId.substring(0, 50) + '...');
+    
     const response = await axios.post(`${API_URL}/google`, { token: tokenId });
+    
+    console.log('AuthService: Backend response status:', response.status);
+    console.log('AuthService: Backend response data:', response.data);
     
     if (response.data.access_token) {
       localStorage.setItem('token', response.data.access_token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
+      console.log('AuthService: Token and user data saved to localStorage');
       return response.data.user;
+    } else {
+      console.error('AuthService: No access_token in response');
+      throw new Error('No access token received from server');
     }
-    
-    return null;
   } catch (error) {
-    console.error('Google login error:', error);
+    console.error('AuthService: Google login error:', error);
+    console.error('AuthService: Error response:', error.response?.data);
+    console.error('AuthService: Error status:', error.response?.status);
     throw error;
   }
 };
