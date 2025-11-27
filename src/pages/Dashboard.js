@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Spinner, Alert, Badge } from 'react-bootstrap';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { getUserData, getStats } from '../services/dashboardService';
+import { 
+  getDashboardData, 
+  getDashboardStats, 
+  saveDashboardData, 
+  saveDashboardStats, 
+  updateDashboardStats,
+  getLastSync 
+} from '../services/localStorageService';
 
 // Register ChartJS components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -12,29 +20,102 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [lastSync, setLastSync] = useState(null);
 
+  // Load data from localStorage first, then sync with server
   useEffect(() => {
-    const fetchData = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const [userData, statsData] = await Promise.all([
-          getUserData(),
-          getStats()
-        ]);
+        
+        // Load from localStorage immediately
+        const localData = getDashboardData();
+        const localStats = getDashboardStats();
+        const syncTime = getLastSync();
+        
+        if (localData.length > 0) {
+          setData(localData);
+          setStats(localStats);
+          setLastSync(syncTime);
+          setLoading(false); // Show local data immediately
+        }
+        
+        // Then sync with server in background
+        try {
+          const [userData, statsData] = await Promise.all([
+            getUserData(),
+            getStats()
+          ]);
 
-        // ✅ Defensive assignment
-        setData(Array.isArray(userData?.data) ? userData.data : (Array.isArray(userData) ? userData : []));
-        setStats(statsData || null);
-        setError('');
+          const serverData = Array.isArray(userData?.data) ? userData.data : (Array.isArray(userData) ? userData : []);
+          const serverStats = statsData || null;
+          
+          // Update state and localStorage
+          setData(serverData);
+          setStats(serverStats);
+          setError('');
+          
+          // Save to localStorage
+          if (serverData.length > 0) {
+            saveDashboardData(serverData);
+          }
+          if (serverStats) {
+            saveDashboardStats(serverStats);
+          }
+          
+          setLastSync(new Date());
+          
+        } catch (serverError) {
+          // If server fails but we have local data, just show warning
+          if (localData.length > 0) {
+            setError('Using offline data. Server sync failed.');
+            console.warn('Server sync failed, using local data:', serverError);
+          } else {
+            setError('Failed to load dashboard data. Please try again later.');
+            console.error('Dashboard data error:', serverError);
+          }
+        }
+        
       } catch (err) {
-        setError('Failed to load dashboard data. Please try again later.');
-        console.error('Dashboard data error:', err);
+        setError('Failed to load dashboard data.');
+        console.error('Dashboard loading error:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    loadData();
+    
+    // Listen for storage events (when data is updated from scraper)
+    const handleStorageChange = (e) => {
+      if (e.key && e.key.includes('dashboard_data')) {
+        const updatedData = getDashboardData();
+        const updatedStats = getDashboardStats();
+        setData(updatedData);
+        setStats(updatedStats);
+        setLastSync(getLastSync());
+        console.log('Dashboard updated from localStorage event');
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events from the same tab
+    const handleCustomUpdate = () => {
+      const updatedData = getDashboardData();
+      const updatedStats = getDashboardStats();
+      setData(updatedData);
+      setStats(updatedStats);
+      setLastSync(getLastSync());
+      console.log('Dashboard updated from custom event');
+    };
+    
+    window.addEventListener('dashboardUpdate', handleCustomUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('dashboardUpdate', handleCustomUpdate);
+    };
   }, []);
 
   const chartData = {
@@ -87,9 +168,16 @@ const Dashboard = () => {
 
   return (
     <Container className="dashboard-container">
-      <h1 className="mb-4">Dashboard</h1>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1 className="mb-0">Dashboard</h1>
+        {lastSync && (
+          <Badge bg="secondary">
+            Last updated: {lastSync.toLocaleTimeString()}
+          </Badge>
+        )}
+      </div>
 
-      {error && <Alert variant="danger">{error}</Alert>}
+      {error && <Alert variant={error.includes('offline') ? 'warning' : 'danger'}>{error}</Alert>}
 
       {stats && (
         <Row className="mb-4">
@@ -158,6 +246,7 @@ const Dashboard = () => {
                       <th>Company</th>
                       <th>Email</th>
                       <th>Phone</th>
+                      <th>Address</th>
                       <th>Website</th>
                       <th>Date</th>
                     </tr>
@@ -166,15 +255,38 @@ const Dashboard = () => {
                     {data.map((item, idx) => (
                       <tr key={item.id || idx}>
                         <td>{item.company_name || 'Unknown'}</td>
-                        <td>{item.email || 'Not found'}</td>
-                        <td>{item.phone || 'Not found'}</td>
                         <td>
-                          {item.website_url ? (
-                            <a href={item.website_url} target="_blank" rel="noopener noreferrer">
-                              {item.website_url}
+                          {item.email && item.email !== 'N/A' && item.email !== 'Not found' ? (
+                            <a href={`mailto:${item.email}`} className="text-decoration-none">
+                              {item.email}
                             </a>
                           ) : (
-                            'Not found'
+                            <span className="text-muted">Not found</span>
+                          )}
+                        </td>
+                        <td>
+                          {item.phone && item.phone !== 'N/A' && item.phone !== 'Not found' ? (
+                            <a href={`tel:${item.phone}`} className="text-decoration-none">
+                              {item.phone}
+                            </a>
+                          ) : (
+                            <span className="text-muted">Not found</span>
+                          )}
+                        </td>
+                        <td>
+                          {item.address && item.address !== 'N/A' && item.address !== 'Not found' ? (
+                            <span>{item.address}</span>
+                          ) : (
+                            <span className="text-muted">Not found</span>
+                          )}
+                        </td>
+                        <td>
+                          {item.website_url && item.website_url !== 'N/A' && item.website_url !== 'Not found' ? (
+                            <a href={item.website_url} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
+                              {item.website_url.length > 30 ? item.website_url.substring(0, 30) + '...' : item.website_url}
+                            </a>
+                          ) : (
+                            <span className="text-muted">Not found</span>
                           )}
                         </td>
                         <td>

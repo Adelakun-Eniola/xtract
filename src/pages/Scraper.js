@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Form, Button, Card, Alert, Spinner, Table, Badge, ProgressBar, ListGroup } from 'react-bootstrap';
 import { extractData, extractDataStream, batchExtract, searchBusinesses, searchBusinessesStream, searchAddressesStream } from '../services/scraperService';
+import { addExtractedData } from '../services/localStorageService';
 
 const Scraper = () => {
   const [url, setUrl] = useState('');
@@ -44,13 +45,35 @@ const Scraper = () => {
           }
         } else if (event.type === 'business') {
           // Add business immediately as it comes in
-          setBusinesses(prev => [...prev, event.data]);
+          const businessData = event.data;
+          setBusinesses(prev => [...prev, businessData]);
           setProgress(event.progress);
           setStatusMessage(`Extracted ${event.progress.current} of ${event.progress.total} businesses...`);
+          
+          // Save to localStorage immediately for real-time dashboard updates
+          const extractedItem = {
+            id: Date.now() + Math.random(), // Temporary ID
+            company_name: businessData.name,
+            email: businessData.email || 'N/A',
+            phone: businessData.phone || 'N/A',
+            address: businessData.address || 'N/A',
+            website_url: businessData.website || 'N/A',
+            created_at: new Date().toISOString()
+          };
+          
+          addExtractedData(extractedItem);
+          
+          // Trigger dashboard update event
+          window.dispatchEvent(new CustomEvent('dashboardUpdate'));
+          
         } else if (event.type === 'complete') {
           setSuccess(event.message || `Found ${event.total} businesses`);
           setStatusMessage('');
           setLoading(false);
+          
+          // Final dashboard update
+          window.dispatchEvent(new CustomEvent('dashboardUpdate'));
+          
         } else if (event.type === 'error') {
           setError(event.error);
           setLoading(false);
@@ -97,13 +120,35 @@ const Scraper = () => {
             }
           } else if (event.type === 'business') {
             // Add business immediately as it comes in
-            setBusinesses(prev => [...prev, event.data]);
+            const businessData = event.data;
+            setBusinesses(prev => [...prev, businessData]);
             setProgress(event.progress);
             setStatusMessage(`Extracted ${event.progress.current} of ${event.progress.total} businesses...`);
+            
+            // Save to localStorage immediately for real-time dashboard updates
+            const extractedItem = {
+              id: Date.now() + Math.random(), // Temporary ID
+              company_name: businessData.name,
+              email: businessData.email || 'N/A',
+              phone: businessData.phone || 'N/A',
+              address: businessData.address || 'N/A',
+              website_url: businessData.website || businessData.url || 'N/A',
+              created_at: new Date().toISOString()
+            };
+            
+            addExtractedData(extractedItem);
+            
+            // Trigger dashboard update event
+            window.dispatchEvent(new CustomEvent('dashboardUpdate'));
+            
           } else if (event.type === 'complete') {
             setSuccess(event.message || `Found ${event.total} businesses`);
             setStatusMessage('');
             setLoading(false);
+            
+            // Final dashboard update
+            window.dispatchEvent(new CustomEvent('dashboardUpdate'));
+            
           } else if (event.type === 'error') {
             setError(event.error);
             setLoading(false);
