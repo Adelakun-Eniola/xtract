@@ -13,7 +13,8 @@ import {
   debugLocalStorage,
   migrateDataToUser,
   addSampleData,
-  refreshDashboardData 
+  refreshDashboardData,
+  ensureDataExists 
 } from '../services/localStorageService';
 
 // Register ChartJS components
@@ -38,33 +39,23 @@ const Dashboard = () => {
         // Debug localStorage contents
         debugLocalStorage();
         
-        // Load from localStorage immediately
-        const localData = getDashboardData();
+        // Ensure data exists and load from localStorage
+        const localData = ensureDataExists();
         const localStats = getDashboardStats();
         const syncTime = getLastSync();
         
         console.log('Dashboard loading - Local data:', localData.length, 'items');
         console.log('Dashboard loading - Local stats:', localStats);
         
-        if (localData.length > 0) {
-          setData(localData);
-          setStats(localStats);
-          setLastSync(syncTime);
-          setLoading(false); // Show local data immediately
-        } else {
-          // For demo purposes, add sample data if no data exists
-          console.log('No local data found, adding sample data for demo');
-          const sampleData = addSampleData();
-          const sampleStats = getDashboardStats();
-          
-          setData(sampleData);
-          setStats(sampleStats);
-          setLastSync(new Date());
-          setLoading(false);
-        }
+        // Always set the data (ensureDataExists guarantees we have data)
+        setData(localData);
+        setStats(localStats);
+        setLastSync(syncTime || new Date());
+        setLoading(false); // Show data immediately
         
-        // Then sync with server in background
+        // Then sync with server in background (but don't overwrite local data if server is empty)
         try {
+          console.log('Dashboard: Attempting server sync...');
           const [userData, statsData] = await Promise.all([
             getUserData(),
             getStats()
@@ -73,26 +64,32 @@ const Dashboard = () => {
           const serverData = Array.isArray(userData?.data) ? userData.data : (Array.isArray(userData) ? userData : []);
           const serverStats = statsData || null;
           
-          // Update state and localStorage
-          setData(serverData);
-          setStats(serverStats);
-          setError('');
+          console.log('Dashboard: Server data received:', serverData.length, 'items');
+          console.log('Dashboard: Server stats received:', serverStats);
           
-          // Save to localStorage
+          // Only update if server has data OR if we don't have local data
           if (serverData.length > 0) {
+            console.log('Dashboard: Updating with server data');
+            setData(serverData);
+            setStats(serverStats);
             saveDashboardData(serverData);
+            if (serverStats) {
+              saveDashboardStats(serverStats);
+            }
+            setLastSync(new Date());
+          } else if (localData.length === 0) {
+            console.log('Dashboard: No server data and no local data, keeping current state');
+            // Don't overwrite local data with empty server data
+          } else {
+            console.log('Dashboard: Server has no data, keeping local data');
+            setError('Using local data. Server has no data yet.');
           }
-          if (serverStats) {
-            saveDashboardStats(serverStats);
-          }
-          
-          setLastSync(new Date());
           
         } catch (serverError) {
           // If server fails but we have local data, just show warning
-          if (localData.length > 0) {
+          console.warn('Dashboard: Server sync failed:', serverError);
+          if (localData.length > 0 || data.length > 0) {
             setError('Using offline data. Server sync failed.');
-            console.warn('Server sync failed, using local data:', serverError);
           } else {
             setError('Failed to load dashboard data. Please try again later.');
             console.error('Dashboard data error:', serverError);
@@ -135,9 +132,22 @@ const Dashboard = () => {
     
     window.addEventListener('dashboardUpdate', handleCustomUpdate);
     
+    // Periodic check to ensure data doesn't disappear
+    const dataCheckInterval = setInterval(() => {
+      const currentData = getDashboardData();
+      if (currentData.length === 0 && data.length > 0) {
+        console.warn('Dashboard: Data disappeared, restoring...');
+        const restoredData = ensureDataExists();
+        const restoredStats = getDashboardStats();
+        setData(restoredData);
+        setStats(restoredStats);
+      }
+    }, 5000); // Check every 5 seconds
+    
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('dashboardUpdate', handleCustomUpdate);
+      clearInterval(dataCheckInterval);
     };
   }, []);
 
@@ -224,6 +234,9 @@ const Dashboard = () => {
           >
             Add Sample Data
           </button>
+          <small className="text-muted ms-2">
+            Items: {data.length} | LocalStorage: {getDashboardData().length}
+          </small>
         </div>
       </div>
 

@@ -9,27 +9,28 @@ const STORAGE_KEYS = {
 const getUserId = () => {
   const token = localStorage.getItem('token');
   if (!token) {
-    console.log('No token found for user ID extraction');
-    return null;
+    console.log('LocalStorage: No token found for user ID extraction');
+    return 'default_user'; // Use default instead of null to prevent data loss
   }
   
   try {
     // Decode JWT token to get user ID (simple base64 decode)
     const payload = JSON.parse(atob(token.split('.')[1]));
     const userId = payload.sub || payload.user_id || payload.identity;
-    console.log('Extracted user ID:', userId);
-    return userId;
+    console.log('LocalStorage: Extracted user ID:', userId);
+    return userId || 'default_user';
   } catch (error) {
-    console.error('Error decoding token:', error);
-    return null;
+    console.error('LocalStorage: Error decoding token:', error);
+    return 'default_user'; // Use default instead of null to prevent data loss
   }
 };
 
 // Create user-specific storage key
 const getUserStorageKey = (key) => {
   const userId = getUserId();
-  // Fallback to a generic key if no user ID (to prevent data loss)
-  return userId ? `${key}_${userId}` : `${key}_default`;
+  const storageKey = `${key}_${userId}`;
+  console.log('LocalStorage: Generated storage key:', storageKey);
+  return storageKey;
 };
 
 // Save dashboard data to local storage
@@ -161,6 +162,25 @@ export const refreshDashboardData = () => {
     return sampleData;
   } catch (error) {
     console.error('Error refreshing dashboard data:', error);
+    return [];
+  }
+};
+
+// Check if data exists and restore if missing
+export const ensureDataExists = () => {
+  try {
+    const currentData = getDashboardData();
+    console.log('LocalStorage: Ensuring data exists, current count:', currentData.length);
+    
+    if (currentData.length === 0) {
+      console.log('LocalStorage: No data found, adding sample data');
+      const sampleData = addSampleData();
+      return sampleData;
+    }
+    
+    return currentData;
+  } catch (error) {
+    console.error('Error ensuring data exists:', error);
     return [];
   }
 };
