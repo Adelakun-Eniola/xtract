@@ -9,7 +9,9 @@ import {
   saveDashboardData, 
   saveDashboardStats, 
   updateDashboardStats,
-  getLastSync 
+  getLastSync,
+  debugLocalStorage,
+  migrateDataToUser 
 } from '../services/localStorageService';
 
 // Register ChartJS components
@@ -28,10 +30,19 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
+        // Migrate any default data to user-specific keys
+        migrateDataToUser();
+        
+        // Debug localStorage contents
+        debugLocalStorage();
+        
         // Load from localStorage immediately
         const localData = getDashboardData();
         const localStats = getDashboardStats();
         const syncTime = getLastSync();
+        
+        console.log('Dashboard loading - Local data:', localData.length, 'items');
+        console.log('Dashboard loading - Local stats:', localStats);
         
         if (localData.length > 0) {
           setData(localData);

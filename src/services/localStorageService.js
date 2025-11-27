@@ -8,12 +8,17 @@ const STORAGE_KEYS = {
 // Get user ID from token for user-specific storage
 const getUserId = () => {
   const token = localStorage.getItem('token');
-  if (!token) return null;
+  if (!token) {
+    console.log('No token found for user ID extraction');
+    return null;
+  }
   
   try {
     // Decode JWT token to get user ID (simple base64 decode)
     const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.sub || payload.user_id || payload.identity;
+    const userId = payload.sub || payload.user_id || payload.identity;
+    console.log('Extracted user ID:', userId);
+    return userId;
   } catch (error) {
     console.error('Error decoding token:', error);
     return null;
@@ -23,7 +28,8 @@ const getUserId = () => {
 // Create user-specific storage key
 const getUserStorageKey = (key) => {
   const userId = getUserId();
-  return userId ? `${key}_${userId}` : key;
+  // Fallback to a generic key if no user ID (to prevent data loss)
+  return userId ? `${key}_${userId}` : `${key}_default`;
 };
 
 // Save dashboard data to local storage
@@ -32,7 +38,7 @@ export const saveDashboardData = (data) => {
     const storageKey = getUserStorageKey(STORAGE_KEYS.DASHBOARD_DATA);
     localStorage.setItem(storageKey, JSON.stringify(data));
     localStorage.setItem(getUserStorageKey(STORAGE_KEYS.LAST_SYNC), new Date().toISOString());
-    console.log('Dashboard data saved to localStorage');
+    console.log('Dashboard data saved to localStorage:', storageKey, data.length, 'items');
   } catch (error) {
     console.error('Error saving dashboard data:', error);
   }
@@ -42,8 +48,11 @@ export const saveDashboardData = (data) => {
 export const getDashboardData = () => {
   try {
     const storageKey = getUserStorageKey(STORAGE_KEYS.DASHBOARD_DATA);
+    console.log('Getting dashboard data with key:', storageKey);
     const data = localStorage.getItem(storageKey);
-    return data ? JSON.parse(data) : [];
+    const parsedData = data ? JSON.parse(data) : [];
+    console.log('Retrieved dashboard data:', parsedData.length, 'items');
+    return parsedData;
   } catch (error) {
     console.error('Error getting dashboard data:', error);
     return [];
@@ -146,4 +155,70 @@ export const getLastSync = () => {
     console.error('Error getting last sync time:', error);
     return null;
   }
+};
+
+// Migrate data from default keys to user-specific keys (for when user logs in)
+export const migrateDataToUser = () => {
+  try {
+    const userId = getUserId();
+    if (!userId) return;
+    
+    // Check if we have data in default keys that should be migrated
+    const defaultDataKey = `${STORAGE_KEYS.DASHBOARD_DATA}_default`;
+    const defaultStatsKey = `${STORAGE_KEYS.DASHBOARD_STATS}_default`;
+    
+    const defaultData = localStorage.getItem(defaultDataKey);
+    const defaultStats = localStorage.getItem(defaultStatsKey);
+    
+    if (defaultData || defaultStats) {
+      console.log('Migrating data from default to user-specific keys');
+      
+      if (defaultData) {
+        const userDataKey = getUserStorageKey(STORAGE_KEYS.DASHBOARD_DATA);
+        localStorage.setItem(userDataKey, defaultData);
+        localStorage.removeItem(defaultDataKey);
+      }
+      
+      if (defaultStats) {
+        const userStatsKey = getUserStorageKey(STORAGE_KEYS.DASHBOARD_STATS);
+        localStorage.setItem(userStatsKey, defaultStats);
+        localStorage.removeItem(defaultStatsKey);
+      }
+      
+      console.log('Data migration completed');
+    }
+  } catch (error) {
+    console.error('Error migrating data:', error);
+  }
+};
+
+// Debug function to check localStorage contents
+export const debugLocalStorage = () => {
+  console.log('=== LocalStorage Debug ===');
+  const userId = getUserId();
+  console.log('Current user ID:', userId);
+  
+  if (userId) {
+    const dataKey = getUserStorageKey(STORAGE_KEYS.DASHBOARD_DATA);
+    const statsKey = getUserStorageKey(STORAGE_KEYS.DASHBOARD_STATS);
+    const syncKey = getUserStorageKey(STORAGE_KEYS.LAST_SYNC);
+    
+    console.log('Data key:', dataKey);
+    console.log('Stats key:', statsKey);
+    console.log('Sync key:', syncKey);
+    
+    const data = localStorage.getItem(dataKey);
+    const stats = localStorage.getItem(statsKey);
+    const sync = localStorage.getItem(syncKey);
+    
+    console.log('Data exists:', !!data, data ? JSON.parse(data).length + ' items' : 'none');
+    console.log('Stats exists:', !!stats, stats ? JSON.parse(stats) : 'none');
+    console.log('Sync exists:', !!sync, sync || 'none');
+  } else {
+    console.log('No user ID - cannot check user-specific storage');
+  }
+  
+  // Show all localStorage keys
+  console.log('All localStorage keys:', Object.keys(localStorage));
+  console.log('=== End Debug ===');
 };

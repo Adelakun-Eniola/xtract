@@ -7,9 +7,11 @@ const Login = ({ setIsAuthenticated, setUser }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    localStorage.clear();
+    // Only clear authentication-related data, preserve dashboard data
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     sessionStorage.clear();
-    console.log('Cleared local and session storage');
+    console.log('Cleared authentication data (preserving dashboard data)');
   }, []);
 
   const handleGoogleSuccess = async (credentialResponse) => {
