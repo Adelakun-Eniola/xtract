@@ -16,6 +16,7 @@ const Login = ({ setIsAuthenticated, setUser }) => {
   }, []);
 
   const handleGoogleSuccess = async (credentialResponse) => {
+    setIsLoading(true);
     try {
       console.log('=== Google Login Process Started ===');
       console.log('Credential response:', credentialResponse);
@@ -27,6 +28,7 @@ const Login = ({ setIsAuthenticated, setUser }) => {
       const freshToken = credentialResponse.credential;
       console.log('Fresh Google Token received at:', new Date().toISOString());
       console.log('Token (first 100 chars):', freshToken.substring(0, 100) + '...');
+      console.log('Token length:', freshToken.length);
       
       setError(''); // Clear any previous errors
       console.log('Calling backend API...');
@@ -52,6 +54,8 @@ const Login = ({ setIsAuthenticated, setUser }) => {
       
       const errorMessage = err.response?.data?.error || err.message || 'Unknown login error';
       setError('Failed to login with Google: ' + errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -85,6 +89,16 @@ const Login = ({ setIsAuthenticated, setUser }) => {
               Extract company details from websites with ease.
             </Card.Text>
             {error && <Alert variant="danger">{error}</Alert>}
+            {isLoading && (
+              <Alert variant="info">
+                <div className="d-flex align-items-center">
+                  <div className="spinner-border spinner-border-sm me-2" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  Logging you in...
+                </div>
+              </Alert>
+            )}
             <div className="d-grid gap-2">
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
