@@ -11,7 +11,9 @@ import {
   updateDashboardStats,
   getLastSync,
   debugLocalStorage,
-  migrateDataToUser 
+  migrateDataToUser,
+  addSampleData,
+  refreshDashboardData 
 } from '../services/localStorageService';
 
 // Register ChartJS components
@@ -49,6 +51,16 @@ const Dashboard = () => {
           setStats(localStats);
           setLastSync(syncTime);
           setLoading(false); // Show local data immediately
+        } else {
+          // For demo purposes, add sample data if no data exists
+          console.log('No local data found, adding sample data for demo');
+          const sampleData = addSampleData();
+          const sampleStats = getDashboardStats();
+          
+          setData(sampleData);
+          setStats(sampleStats);
+          setLastSync(new Date());
+          setLoading(false);
         }
         
         // Then sync with server in background
@@ -181,11 +193,38 @@ const Dashboard = () => {
     <Container className="dashboard-container">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="mb-0">Dashboard</h1>
-        {lastSync && (
-          <Badge bg="secondary">
-            Last updated: {lastSync.toLocaleTimeString()}
-          </Badge>
-        )}
+        <div className="d-flex align-items-center gap-2">
+          {lastSync && (
+            <Badge bg="secondary">
+              Last updated: {lastSync.toLocaleTimeString()}
+            </Badge>
+          )}
+          <button 
+            className="btn btn-sm btn-outline-primary me-2"
+            onClick={() => {
+              debugLocalStorage();
+              const currentData = getDashboardData();
+              const currentStats = getDashboardStats();
+              console.log('Manual debug - Data:', currentData.length, 'items');
+              console.log('Manual debug - Stats:', currentStats);
+            }}
+          >
+            Debug Storage
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-success"
+            onClick={() => {
+              const newData = refreshDashboardData();
+              const newStats = getDashboardStats();
+              setData(newData);
+              setStats(newStats);
+              setLastSync(new Date());
+              console.log('Dashboard refreshed with sample data');
+            }}
+          >
+            Add Sample Data
+          </button>
+        </div>
       </div>
 
       {error && <Alert variant={error.includes('offline') ? 'warning' : 'danger'}>{error}</Alert>}
