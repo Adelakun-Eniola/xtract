@@ -8,10 +8,8 @@ import {
   getDashboardStats, 
   saveDashboardData, 
   saveDashboardStats, 
-  updateDashboardStats,
   getLastSync,
   migrateDataToUser,
-  addSampleData,
   ensureDataExists 
 } from '../services/localStorageService';
 
@@ -204,19 +202,7 @@ const Dashboard = () => {
               Last updated: {lastSync.toLocaleTimeString()}
             </Badge>
           )}
-          <button 
-            className="btn btn-sm btn-outline-success"
-            onClick={() => {
-              const newData = addSampleData();
-              const newStats = getDashboardStats();
-              setData(newData);
-              setStats(newStats);
-              setLastSync(new Date());
-              console.log('Sample data added to dashboard');
-            }}
-          >
-            Add Sample Data
-          </button>
+
           <small className="text-muted ms-2">
             Items: {data.length} | LocalStorage: {getDashboardData().length}
           </small>
