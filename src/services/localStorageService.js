@@ -83,8 +83,8 @@ export const getDashboardStats = () => {
   }
 };
 
-// Add new extracted data to local storage and automatically sync to server
-export const addExtractedData = async (newData) => {
+// Add new extracted data to local storage (backend now automatically saves to database)
+export const addExtractedData = (newData) => {
   try {
     const existingData = getDashboardData();
     const updatedData = Array.isArray(newData) ? [...existingData, ...newData] : [...existingData, newData];
@@ -97,19 +97,7 @@ export const addExtractedData = async (newData) => {
     // Update stats
     updateDashboardStats(updatedData);
     
-    console.log('New extracted data added to localStorage');
-    
-    // Automatically sync to server in background
-    try {
-      const syncResult = await syncDataToServer();
-      if (syncResult.success) {
-        console.log('Auto-sync successful:', syncResult.message);
-      } else {
-        console.warn('Auto-sync failed:', syncResult.error);
-      }
-    } catch (syncError) {
-      console.warn('Auto-sync error (continuing with local storage):', syncError.message);
-    }
+    console.log('New extracted data added to localStorage (backend automatically saves to database)');
     
     return updatedData;
   } catch (error) {

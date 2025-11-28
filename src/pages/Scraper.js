@@ -34,7 +34,7 @@ const Scraper = () => {
       setProgress({ current: 0, total: 0 });
       setStatusMessage('Searching for businesses and extracting phone numbers, addresses, websites & emails...');
       
-      await searchAddressesStream(url, async (event) => {
+      await searchAddressesStream(url, (event) => {
         console.log('Frontend received address event:', event.type, event);
         
         if (event.type === 'status') {
@@ -61,7 +61,7 @@ const Scraper = () => {
             created_at: new Date().toISOString()
           };
           
-          await addExtractedData(extractedItem);
+          addExtractedData(extractedItem);
           
           // Trigger dashboard update event
           window.dispatchEvent(new CustomEvent('dashboardUpdate'));
@@ -109,7 +109,7 @@ const Scraper = () => {
       
       // Use streaming for phone extraction
       if (includePhone) {
-        await searchBusinessesStream(url, async (event) => {
+        await searchBusinessesStream(url, (event) => {
           console.log('Frontend received event:', event.type, event);
           
           if (event.type === 'status') {
@@ -136,7 +136,7 @@ const Scraper = () => {
               created_at: new Date().toISOString()
             };
             
-            await addExtractedData(extractedItem);
+            addExtractedData(extractedItem);
             
             // Trigger dashboard update event
             window.dispatchEvent(new CustomEvent('dashboardUpdate'));

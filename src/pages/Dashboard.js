@@ -74,39 +74,8 @@ const Dashboard = () => {
             console.log('Dashboard: No server data and no local data, keeping current state');
             // Don't overwrite local data with empty server data
           } else {
-            console.log('Dashboard: Server has no data, auto-syncing local data...');
-            // Automatically sync local data to server
-            try {
-              const { syncDataToServer } = await import('../services/localStorageService');
-              const syncResult = await syncDataToServer();
-              if (syncResult.success && syncResult.synced_count > 0) {
-                console.log('Auto-sync successful, refreshing data...');
-                // Refresh data from server after sync
-                const [newUserData, newStatsData] = await Promise.all([
-                  getUserData(),
-                  getStats()
-                ]);
-                const newServerData = Array.isArray(newUserData?.data) ? newUserData.data : [];
-                const newServerStats = newStatsData || null;
-                if (newServerData.length > 0) {
-                  setData(newServerData);
-                  setStats(newServerStats);
-                  saveDashboardData(newServerData);
-                  if (newServerStats) {
-                    saveDashboardStats(newServerStats);
-                  }
-                  setLastSync(new Date());
-                  setError(''); // Clear the error message
-                } else {
-                  setError('Using local data. Server sync completed but no data returned.');
-                }
-              } else {
-                setError('Using local data. Auto-sync failed - server may be unavailable.');
-              }
-            } catch (syncError) {
-              console.warn('Auto-sync failed:', syncError);
-              setError('Using local data. Server has no data yet.');
-            }
+            console.log('Dashboard: Server has no data, keeping local data');
+            setError('Using local data. Server will sync automatically when you extract new data.');
           }
           
         } catch (serverError) {
