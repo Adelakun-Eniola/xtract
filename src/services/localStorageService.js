@@ -146,25 +146,6 @@ export const clearDashboardData = () => {
   }
 };
 
-// Force refresh dashboard data (for testing)
-export const refreshDashboardData = () => {
-  try {
-    // Clear existing data
-    clearDashboardData();
-    
-    // Add fresh sample data
-    const sampleData = addSampleData();
-    
-    // Trigger dashboard update event
-    window.dispatchEvent(new CustomEvent('dashboardUpdate'));
-    
-    console.log('Dashboard data refreshed with sample data');
-    return sampleData;
-  } catch (error) {
-    console.error('Error refreshing dashboard data:', error);
-    return [];
-  }
-};
 
 // Check if data exists and restore if missing
 export const ensureDataExists = () => {
@@ -173,14 +154,58 @@ export const ensureDataExists = () => {
     console.log('LocalStorage: Ensuring data exists, current count:', currentData.length);
     
     if (currentData.length === 0) {
-      console.log('LocalStorage: No data found, adding sample data');
-      const sampleData = addSampleData();
+      console.log('LocalStorage: No data found, adding initial sample data');
+      const sampleData = addInitialSampleData();
       return sampleData;
     }
     
     return currentData;
   } catch (error) {
     console.error('Error ensuring data exists:', error);
+    return [];
+  }
+};
+
+// Add initial sample data (only when no data exists)
+const addInitialSampleData = () => {
+  try {
+    const sampleBusinesses = [
+      {
+        id: Date.now() + 1,
+        company_name: 'Sample Pizza Company',
+        email: 'info@samplepizza.com',
+        phone: '+1 555-123-4567',
+        address: '123 Main Street, New York, NY 10001',
+        website_url: 'https://samplepizza.com',
+        created_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
+      },
+      {
+        id: Date.now() + 2,
+        company_name: 'Demo Restaurant',
+        email: 'contact@demorestaurant.com',
+        phone: '+1 555-987-6543',
+        address: '456 Broadway, New York, NY 10002',
+        website_url: 'https://demorestaurant.com',
+        created_at: new Date(Date.now() - 43200000).toISOString() // 12 hours ago
+      },
+      {
+        id: Date.now() + 3,
+        company_name: 'Test Cafe',
+        email: 'N/A',
+        phone: '+1 555-456-7890',
+        address: 'N/A',
+        website_url: 'https://testcafe.com',
+        created_at: new Date().toISOString()
+      }
+    ];
+    
+    saveDashboardData(sampleBusinesses);
+    updateDashboardStats(sampleBusinesses);
+    
+    console.log('Initial sample data added to localStorage:', sampleBusinesses.length, 'items');
+    return sampleBusinesses;
+  } catch (error) {
+    console.error('Error adding initial sample data:', error);
     return [];
   }
 };
@@ -232,14 +257,10 @@ export const migrateDataToUser = () => {
   }
 };
 
-// Add sample data for testing (when no data exists)
+// Add sample data for testing
 export const addSampleData = () => {
   try {
     const existingData = getDashboardData();
-    if (existingData.length > 0) {
-      console.log('Sample data not added - existing data found');
-      return existingData;
-    }
     
     const sampleBusinesses = [
       {
@@ -271,14 +292,17 @@ export const addSampleData = () => {
       }
     ];
     
-    saveDashboardData(sampleBusinesses);
-    updateDashboardStats(sampleBusinesses);
+    // Add sample data to existing data
+    const updatedData = [...existingData, ...sampleBusinesses];
     
-    console.log('Sample data added to localStorage:', sampleBusinesses.length, 'items');
-    return sampleBusinesses;
+    saveDashboardData(updatedData);
+    updateDashboardStats(updatedData);
+    
+    console.log('Sample data added to localStorage:', sampleBusinesses.length, 'new items,', updatedData.length, 'total');
+    return updatedData;
   } catch (error) {
     console.error('Error adding sample data:', error);
-    return [];
+    return getDashboardData();
   }
 };
 

@@ -10,10 +10,8 @@ import {
   saveDashboardStats, 
   updateDashboardStats,
   getLastSync,
-  debugLocalStorage,
   migrateDataToUser,
   addSampleData,
-  refreshDashboardData,
   ensureDataExists 
 } from '../services/localStorageService';
 
@@ -35,9 +33,6 @@ const Dashboard = () => {
         
         // Migrate any default data to user-specific keys
         migrateDataToUser();
-        
-        // Debug localStorage contents
-        debugLocalStorage();
         
         // Ensure data exists and load from localStorage
         const localData = ensureDataExists();
@@ -210,26 +205,14 @@ const Dashboard = () => {
             </Badge>
           )}
           <button 
-            className="btn btn-sm btn-outline-primary me-2"
-            onClick={() => {
-              debugLocalStorage();
-              const currentData = getDashboardData();
-              const currentStats = getDashboardStats();
-              console.log('Manual debug - Data:', currentData.length, 'items');
-              console.log('Manual debug - Stats:', currentStats);
-            }}
-          >
-            Debug Storage
-          </button>
-          <button 
             className="btn btn-sm btn-outline-success"
             onClick={() => {
-              const newData = refreshDashboardData();
+              const newData = addSampleData();
               const newStats = getDashboardStats();
               setData(newData);
               setStats(newStats);
               setLastSync(new Date());
-              console.log('Dashboard refreshed with sample data');
+              console.log('Sample data added to dashboard');
             }}
           >
             Add Sample Data
