@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Spinner, Alert, Badge, Modal, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Spinner, Alert, Badge, Toast, ToastContainer, ProgressBar } from 'react-bootstrap';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { getUserData, getStats } from '../services/dashboardService';
@@ -51,11 +51,11 @@ const Dashboard = () => {
         
         // Then sync with server in background (but don't overwrite local data if server is empty)
         try {
-          // Show sync popup if we have local data but need to check server
+          // Show sync toast if we have local data but need to check server
           if (localData.length > 0) {
             setShowSyncModal(true);
-            setSyncMessage('Syncing with server...');
-            setSyncProgress(20);
+            setSyncMessage('Checking for updates');
+            setSyncProgress(30);
           }
           
           console.log('Dashboard: Attempting server sync...');
@@ -65,8 +65,8 @@ const Dashboard = () => {
           ]);
           
           if (localData.length > 0) {
-            setSyncProgress(60);
-            setSyncMessage('Processing server data...');
+            setSyncProgress(70);
+            setSyncMessage('Syncing data');
           }
 
           const serverData = Array.isArray(userData?.data) ? userData.data : (Array.isArray(userData) ? userData : []);
@@ -80,7 +80,7 @@ const Dashboard = () => {
             console.log('Dashboard: Updating with server data');
             if (localData.length > 0) {
               setSyncProgress(90);
-              setSyncMessage('Updating dashboard...');
+              setSyncMessage('Almost done');
             }
             setData(serverData);
             setStats(serverStats);
@@ -93,11 +93,11 @@ const Dashboard = () => {
             // Complete sync
             if (localData.length > 0) {
               setSyncProgress(100);
-              setSyncMessage('Sync complete!');
+              setSyncMessage('Up to date');
               setTimeout(() => {
                 setShowSyncModal(false);
                 setSyncProgress(0);
-              }, 1000);
+              }, 1500);
             }
           } else if (localData.length === 0) {
             console.log('Dashboard: No server data and no local data, keeping current state');
@@ -106,14 +106,14 @@ const Dashboard = () => {
             console.log('Dashboard: Server has no data, keeping local data');
             setError('Using local data. Server will sync automatically when you extract new data.');
             
-            // Hide sync popup since we're keeping local data
+            // Hide sync toast since we're keeping local data
             if (showSyncModal) {
               setSyncProgress(100);
-              setSyncMessage('Using local data');
+              setSyncMessage('Using offline data');
               setTimeout(() => {
                 setShowSyncModal(false);
                 setSyncProgress(0);
-              }, 1500);
+              }, 2000);
             }
           }
           
@@ -121,14 +121,14 @@ const Dashboard = () => {
           // If server fails but we have local data, just show warning
           console.warn('Dashboard: Server sync failed:', serverError);
           
-          // Hide sync popup on error
+          // Hide sync toast on error
           if (showSyncModal) {
-            setSyncMessage('Sync failed - using local data');
+            setSyncMessage('Connection failed');
             setSyncProgress(100);
             setTimeout(() => {
               setShowSyncModal(false);
               setSyncProgress(0);
-            }, 2000);
+            }, 2500);
           }
           
           if (localData.length > 0 || data.length > 0) {
@@ -244,31 +244,31 @@ const Dashboard = () => {
 
   return (
     <>
-      {/* Sync Progress Modal */}
-      <Modal 
-        show={showSyncModal} 
-        backdrop="static" 
-        keyboard={false}
-        centered
-        size="sm"
-      >
-        <Modal.Body className="text-center p-4">
-          <div className="mb-3">
+      {/* Sync Progress Toast */}
+      <ToastContainer position="bottom-end" className="p-3">
+        <Toast 
+          show={showSyncModal} 
+          onClose={() => setShowSyncModal(false)}
+          autohide={false}
+          bg="light"
+        >
+          <Toast.Header closeButton={false}>
             <Spinner animation="border" size="sm" className="me-2" />
-            <strong>{syncMessage}</strong>
-          </div>
-          <ProgressBar 
-            now={syncProgress} 
-            animated 
-            striped 
-            variant="primary"
-            style={{ height: '8px' }}
-          />
-          <small className="text-muted mt-2 d-block">
-            {syncProgress}% complete
-          </small>
-        </Modal.Body>
-      </Modal>
+            <strong className="me-auto">{syncMessage}</strong>
+          </Toast.Header>
+          <Toast.Body>
+            <ProgressBar 
+              now={syncProgress} 
+              animated 
+              striped 
+              variant="primary"
+              style={{ height: '6px' }}
+              className="mb-2"
+            />
+            <small className="text-muted">{syncProgress}% complete</small>
+          </Toast.Body>
+        </Toast>
+      </ToastContainer>
 
       <Container className="dashboard-container">
       <div className="d-flex justify-content-between align-items-center mb-4">
