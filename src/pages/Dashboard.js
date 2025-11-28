@@ -49,39 +49,34 @@ const Dashboard = () => {
         setLastSync(syncTime || new Date());
         setLoading(false); // Show data immediately
         
-        // Then sync with server in background (but don't overwrite local data if server is empty)
+        // Sync with server database to get your extracted businesses
         try {
-          // Show sync toast if we have local data but need to check server
+          // Show sync toast if we have local data
           if (localData.length > 0) {
             setShowSyncModal(true);
-            setSyncMessage('Checking for updates');
+            setSyncMessage('Checking database');
             setSyncProgress(30);
           }
           
-          console.log('Dashboard: Attempting server sync...');
+          console.log('Dashboard: Fetching data from database...');
           const [userData, statsData] = await Promise.all([
             getUserData(),
             getStats()
           ]);
           
           if (localData.length > 0) {
-            setSyncProgress(70);
-            setSyncMessage('Syncing data');
+            setSyncProgress(80);
+            setSyncMessage('Loading data');
           }
 
           const serverData = Array.isArray(userData?.data) ? userData.data : (Array.isArray(userData) ? userData : []);
           const serverStats = statsData || null;
           
-          console.log('Dashboard: Server data received:', serverData.length, 'items');
-          console.log('Dashboard: Server stats received:', serverStats);
+          console.log('Dashboard: Database returned:', serverData.length, 'businesses');
           
-          // Only update if server has data OR if we don't have local data
+          // Update with server data if it exists, otherwise keep local data
           if (serverData.length > 0) {
-            console.log('Dashboard: Updating with server data');
-            if (localData.length > 0) {
-              setSyncProgress(90);
-              setSyncMessage('Almost done');
-            }
+            console.log('Dashboard: Using database data');
             setData(serverData);
             setStats(serverStats);
             saveDashboardData(serverData);
@@ -90,52 +85,44 @@ const Dashboard = () => {
             }
             setLastSync(new Date());
             
-            // Complete sync
-            if (localData.length > 0) {
+            if (showSyncModal) {
               setSyncProgress(100);
               setSyncMessage('Up to date');
               setTimeout(() => {
                 setShowSyncModal(false);
                 setSyncProgress(0);
-              }, 1500);
+              }, 1000);
             }
-          } else if (localData.length === 0) {
-            console.log('Dashboard: No server data and no local data, keeping current state');
-            // Don't overwrite local data with empty server data
           } else {
-            console.log('Dashboard: Server has no data, keeping local data');
-            setError('Using local data. Server will sync automatically when you extract new data.');
+            console.log('Dashboard: Database empty, keeping local data');
+            setError('Using local data. Database will sync when you extract new businesses.');
             
-            // Hide sync toast since we're keeping local data
             if (showSyncModal) {
               setSyncProgress(100);
-              setSyncMessage('Using offline data');
+              setSyncMessage('Database empty');
               setTimeout(() => {
                 setShowSyncModal(false);
                 setSyncProgress(0);
-              }, 2000);
+              }, 1500);
             }
           }
           
         } catch (serverError) {
-          // If server fails but we have local data, just show warning
-          console.warn('Dashboard: Server sync failed:', serverError);
+          console.warn('Dashboard: Database fetch failed:', serverError);
           
-          // Hide sync toast on error
           if (showSyncModal) {
-            setSyncMessage('Connection failed');
+            setSyncMessage('Database unavailable');
             setSyncProgress(100);
             setTimeout(() => {
               setShowSyncModal(false);
               setSyncProgress(0);
-            }, 2500);
+            }, 2000);
           }
           
-          if (localData.length > 0 || data.length > 0) {
-            setError('Using offline data. Server sync failed.');
+          if (localData.length > 0) {
+            setError('Using local data. Database connection failed.');
           } else {
-            setError('Failed to load dashboard data. Please try again later.');
-            console.error('Dashboard data error:', serverError);
+            setError('Failed to load data. Please try again later.');
           }
         }
         
@@ -244,7 +231,7 @@ const Dashboard = () => {
 
   return (
     <>
-      {/* Sync Progress Toast */}
+      {/* Database Sync Toast */}
       <ToastContainer position="bottom-end" className="p-3">
         <Toast 
           show={showSyncModal} 
