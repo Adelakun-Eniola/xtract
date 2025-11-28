@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Spinner, Alert, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Spinner, Alert, Badge, Modal, ProgressBar } from 'react-bootstrap';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { getUserData, getStats } from '../services/dashboardService';
@@ -22,6 +22,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastSync, setLastSync] = useState(null);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [syncMessage, setSyncMessage] = useState('');
 
   // Load data from localStorage first, then sync with server
   useEffect(() => {
@@ -48,11 +51,23 @@ const Dashboard = () => {
         
         // Then sync with server in background (but don't overwrite local data if server is empty)
         try {
+          // Show sync popup if we have local data but need to check server
+          if (localData.length > 0) {
+            setShowSyncModal(true);
+            setSyncMessage('Syncing with server...');
+            setSyncProgress(20);
+          }
+          
           console.log('Dashboard: Attempting server sync...');
           const [userData, statsData] = await Promise.all([
             getUserData(),
             getStats()
           ]);
+          
+          if (localData.length > 0) {
+            setSyncProgress(60);
+            setSyncMessage('Processing server data...');
+          }
 
           const serverData = Array.isArray(userData?.data) ? userData.data : (Array.isArray(userData) ? userData : []);
           const serverStats = statsData || null;
@@ -63,6 +78,10 @@ const Dashboard = () => {
           // Only update if server has data OR if we don't have local data
           if (serverData.length > 0) {
             console.log('Dashboard: Updating with server data');
+            if (localData.length > 0) {
+              setSyncProgress(90);
+              setSyncMessage('Updating dashboard...');
+            }
             setData(serverData);
             setStats(serverStats);
             saveDashboardData(serverData);
@@ -70,17 +89,48 @@ const Dashboard = () => {
               saveDashboardStats(serverStats);
             }
             setLastSync(new Date());
+            
+            // Complete sync
+            if (localData.length > 0) {
+              setSyncProgress(100);
+              setSyncMessage('Sync complete!');
+              setTimeout(() => {
+                setShowSyncModal(false);
+                setSyncProgress(0);
+              }, 1000);
+            }
           } else if (localData.length === 0) {
             console.log('Dashboard: No server data and no local data, keeping current state');
             // Don't overwrite local data with empty server data
           } else {
             console.log('Dashboard: Server has no data, keeping local data');
             setError('Using local data. Server will sync automatically when you extract new data.');
+            
+            // Hide sync popup since we're keeping local data
+            if (showSyncModal) {
+              setSyncProgress(100);
+              setSyncMessage('Using local data');
+              setTimeout(() => {
+                setShowSyncModal(false);
+                setSyncProgress(0);
+              }, 1500);
+            }
           }
           
         } catch (serverError) {
           // If server fails but we have local data, just show warning
           console.warn('Dashboard: Server sync failed:', serverError);
+          
+          // Hide sync popup on error
+          if (showSyncModal) {
+            setSyncMessage('Sync failed - using local data');
+            setSyncProgress(100);
+            setTimeout(() => {
+              setShowSyncModal(false);
+              setSyncProgress(0);
+            }, 2000);
+          }
+          
           if (localData.length > 0 || data.length > 0) {
             setError('Using offline data. Server sync failed.');
           } else {
@@ -193,7 +243,34 @@ const Dashboard = () => {
   }
 
   return (
-    <Container className="dashboard-container">
+    <>
+      {/* Sync Progress Modal */}
+      <Modal 
+        show={showSyncModal} 
+        backdrop="static" 
+        keyboard={false}
+        centered
+        size="sm"
+      >
+        <Modal.Body className="text-center p-4">
+          <div className="mb-3">
+            <Spinner animation="border" size="sm" className="me-2" />
+            <strong>{syncMessage}</strong>
+          </div>
+          <ProgressBar 
+            now={syncProgress} 
+            animated 
+            striped 
+            variant="primary"
+            style={{ height: '8px' }}
+          />
+          <small className="text-muted mt-2 d-block">
+            {syncProgress}% complete
+          </small>
+        </Modal.Body>
+      </Modal>
+
+      <Container className="dashboard-container">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="mb-0">Dashboard</h1>
         <div className="d-flex align-items-center gap-2">
@@ -332,6 +409,7 @@ const Dashboard = () => {
         </Col>
       </Row>
     </Container>
+    </>
   );
 };
 
