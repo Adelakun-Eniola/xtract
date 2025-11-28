@@ -10,8 +10,7 @@ import {
   saveDashboardStats, 
   getLastSync,
   migrateDataToUser,
-  ensureDataExists,
-  removeDemoData 
+  ensureDataExists 
 } from '../services/localStorageService';
 
 // Register ChartJS components
@@ -203,19 +202,6 @@ const Dashboard = () => {
               Last updated: {lastSync.toLocaleTimeString()}
             </Badge>
           )}
-          <button 
-            className="btn btn-sm btn-outline-danger"
-            onClick={() => {
-              const cleanedData = removeDemoData();
-              setData(cleanedData);
-              const newStats = getDashboardStats();
-              setStats(newStats);
-              setLastSync(new Date());
-              console.log('Demo data removed from dashboard');
-            }}
-          >
-            Remove Demo Data
-          </button>
         </div>
       </div>
 
