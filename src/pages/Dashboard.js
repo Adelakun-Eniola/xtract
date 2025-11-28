@@ -10,7 +10,8 @@ import {
   saveDashboardStats, 
   getLastSync,
   migrateDataToUser,
-  ensureDataExists 
+  ensureDataExists,
+  syncDataToServer 
 } from '../services/localStorageService';
 
 // Register ChartJS components
@@ -22,6 +23,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastSync, setLastSync] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   // Load data from localStorage first, then sync with server
   useEffect(() => {
@@ -202,10 +204,44 @@ const Dashboard = () => {
               Last updated: {lastSync.toLocaleTimeString()}
             </Badge>
           )}
-
-          <small className="text-muted ms-2">
-            Items: {data.length} | LocalStorage: {getDashboardData().length}
-          </small>
+          <button 
+            className="btn btn-sm btn-outline-primary"
+            onClick={async () => {
+              setSyncing(true);
+              try {
+                const result = await syncDataToServer();
+                if (result.success) {
+                  setError(''); // Clear any existing errors
+                  // Refresh data from server after sync
+                  const [userData, statsData] = await Promise.all([
+                    getUserData(),
+                    getStats()
+                  ]);
+                  const serverData = Array.isArray(userData?.data) ? userData.data : [];
+                  const serverStats = statsData || null;
+                  if (serverData.length > 0) {
+                    setData(serverData);
+                    setStats(serverStats);
+                    saveDashboardData(serverData);
+                    if (serverStats) {
+                      saveDashboardStats(serverStats);
+                    }
+                    setLastSync(new Date());
+                  }
+                  console.log('Sync successful:', result.message);
+                } else {
+                  setError(`Sync failed: ${result.error}`);
+                }
+              } catch (err) {
+                setError(`Sync failed: ${err.message}`);
+              } finally {
+                setSyncing(false);
+              }
+            }}
+            disabled={syncing}
+          >
+            {syncing ? 'Syncing...' : 'Sync to Server'}
+          </button>
         </div>
       </div>
 

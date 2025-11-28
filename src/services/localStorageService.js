@@ -306,6 +306,58 @@ export const addSampleData = () => {
   }
 };
 
+// Sync local data to server
+export const syncDataToServer = async () => {
+  try {
+    const localData = getDashboardData();
+    
+    if (localData.length === 0) {
+      console.log('No local data to sync');
+      return { success: true, message: 'No data to sync', synced_count: 0 };
+    }
+    
+    console.log('Syncing', localData.length, 'businesses to server...');
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const response = await fetch('/api/scraper/sync-data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        businesses: localData
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to sync data');
+    }
+    
+    const result = await response.json();
+    console.log('Sync result:', result);
+    
+    return {
+      success: true,
+      message: result.message,
+      synced_count: result.synced_count,
+      errors: result.errors || []
+    };
+    
+  } catch (error) {
+    console.error('Error syncing data to server:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 // Debug function to check localStorage contents
 export const debugLocalStorage = () => {
   console.log('=== LocalStorage Debug ===');
