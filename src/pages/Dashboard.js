@@ -10,8 +10,7 @@ import {
   saveDashboardStats, 
   getLastSync,
   migrateDataToUser,
-  ensureDataExists,
-  syncDataToServer 
+  ensureDataExists 
 } from '../services/localStorageService';
 
 // Register ChartJS components
@@ -23,7 +22,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastSync, setLastSync] = useState(null);
-  const [syncing, setSyncing] = useState(false);
 
   // Load data from localStorage first, then sync with server
   useEffect(() => {
@@ -76,8 +74,39 @@ const Dashboard = () => {
             console.log('Dashboard: No server data and no local data, keeping current state');
             // Don't overwrite local data with empty server data
           } else {
-            console.log('Dashboard: Server has no data, keeping local data');
-            setError('Using local data. Server has no data yet.');
+            console.log('Dashboard: Server has no data, auto-syncing local data...');
+            // Automatically sync local data to server
+            try {
+              const { syncDataToServer } = await import('../services/localStorageService');
+              const syncResult = await syncDataToServer();
+              if (syncResult.success && syncResult.synced_count > 0) {
+                console.log('Auto-sync successful, refreshing data...');
+                // Refresh data from server after sync
+                const [newUserData, newStatsData] = await Promise.all([
+                  getUserData(),
+                  getStats()
+                ]);
+                const newServerData = Array.isArray(newUserData?.data) ? newUserData.data : [];
+                const newServerStats = newStatsData || null;
+                if (newServerData.length > 0) {
+                  setData(newServerData);
+                  setStats(newServerStats);
+                  saveDashboardData(newServerData);
+                  if (newServerStats) {
+                    saveDashboardStats(newServerStats);
+                  }
+                  setLastSync(new Date());
+                  setError(''); // Clear the error message
+                } else {
+                  setError('Using local data. Server sync completed but no data returned.');
+                }
+              } else {
+                setError('Using local data. Auto-sync failed - server may be unavailable.');
+              }
+            } catch (syncError) {
+              console.warn('Auto-sync failed:', syncError);
+              setError('Using local data. Server has no data yet.');
+            }
           }
           
         } catch (serverError) {
@@ -204,44 +233,6 @@ const Dashboard = () => {
               Last updated: {lastSync.toLocaleTimeString()}
             </Badge>
           )}
-          <button 
-            className="btn btn-sm btn-outline-primary"
-            onClick={async () => {
-              setSyncing(true);
-              try {
-                const result = await syncDataToServer();
-                if (result.success) {
-                  setError(''); // Clear any existing errors
-                  // Refresh data from server after sync
-                  const [userData, statsData] = await Promise.all([
-                    getUserData(),
-                    getStats()
-                  ]);
-                  const serverData = Array.isArray(userData?.data) ? userData.data : [];
-                  const serverStats = statsData || null;
-                  if (serverData.length > 0) {
-                    setData(serverData);
-                    setStats(serverStats);
-                    saveDashboardData(serverData);
-                    if (serverStats) {
-                      saveDashboardStats(serverStats);
-                    }
-                    setLastSync(new Date());
-                  }
-                  console.log('Sync successful:', result.message);
-                } else {
-                  setError(`Sync failed: ${result.error}`);
-                }
-              } catch (err) {
-                setError(`Sync failed: ${err.message}`);
-              } finally {
-                setSyncing(false);
-              }
-            }}
-            disabled={syncing}
-          >
-            {syncing ? 'Syncing...' : 'Sync to Server'}
-          </button>
         </div>
       </div>
 

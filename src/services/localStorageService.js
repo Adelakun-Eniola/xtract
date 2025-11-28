@@ -83,8 +83,8 @@ export const getDashboardStats = () => {
   }
 };
 
-// Add new extracted data to local storage
-export const addExtractedData = (newData) => {
+// Add new extracted data to local storage and automatically sync to server
+export const addExtractedData = async (newData) => {
   try {
     const existingData = getDashboardData();
     const updatedData = Array.isArray(newData) ? [...existingData, ...newData] : [...existingData, newData];
@@ -98,6 +98,19 @@ export const addExtractedData = (newData) => {
     updateDashboardStats(updatedData);
     
     console.log('New extracted data added to localStorage');
+    
+    // Automatically sync to server in background
+    try {
+      const syncResult = await syncDataToServer();
+      if (syncResult.success) {
+        console.log('Auto-sync successful:', syncResult.message);
+      } else {
+        console.warn('Auto-sync failed:', syncResult.error);
+      }
+    } catch (syncError) {
+      console.warn('Auto-sync error (continuing with local storage):', syncError.message);
+    }
+    
     return updatedData;
   } catch (error) {
     console.error('Error adding extracted data:', error);
@@ -335,11 +348,22 @@ export const syncDataToServer = async () => {
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to sync data');
+      let errorMessage = 'Failed to sync data';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (parseError) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
     }
     
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      throw new Error('Invalid response from server');
+    }
     console.log('Sync result:', result);
     
     return {
