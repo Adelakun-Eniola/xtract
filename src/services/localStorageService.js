@@ -370,6 +370,55 @@ export const syncDataToServer = async () => {
   }
 };
 
+// Remove demo/test entries from localStorage
+export const removeDemoData = () => {
+  try {
+    const currentData = getDashboardData();
+    
+    // List of demo/test company names to remove
+    const demoNames = [
+      'Sample Pizza Company',
+      'Demo Restaurant', 
+      'Test Cafe',
+      'Sample Business',
+      'Demo Business',
+      'Test Business'
+    ];
+    
+    // Filter out demo entries
+    const cleanedData = currentData.filter(item => {
+      const companyName = item.company_name || '';
+      return !demoNames.includes(companyName);
+    });
+    
+    // Also filter out entries with demo domains
+    const demoDomains = [
+      'samplepizza.com',
+      'demorestaurant.com',
+      'testcafe.com',
+      'sample.com',
+      'demo.com',
+      'test.com'
+    ];
+    
+    const finalCleanedData = cleanedData.filter(item => {
+      const websiteUrl = item.website_url || '';
+      return !demoDomains.some(domain => websiteUrl.includes(domain));
+    });
+    
+    console.log(`Removed ${currentData.length - finalCleanedData.length} demo entries`);
+    
+    // Save cleaned data
+    saveDashboardData(finalCleanedData);
+    updateDashboardStats(finalCleanedData);
+    
+    return finalCleanedData;
+  } catch (error) {
+    console.error('Error removing demo data:', error);
+    return getDashboardData();
+  }
+};
+
 // Debug function to check localStorage contents
 export const debugLocalStorage = () => {
   console.log('=== LocalStorage Debug ===');
