@@ -53,33 +53,6 @@ const Dashboard = () => {
         console.log('Dashboard: Using localStorage only - no database interference');
         // Database sync disabled to prevent data loss
         // Keep using localStorage data permanently
-              setSyncProgress(100);
-              setSyncMessage('Database empty');
-              setTimeout(() => {
-                setShowSyncModal(false);
-                setSyncProgress(0);
-              }, 1500);
-            }
-          }
-          
-        } catch (serverError) {
-          console.warn('Dashboard: Database fetch failed:', serverError);
-          
-          if (showSyncModal) {
-            setSyncMessage('Database unavailable');
-            setSyncProgress(100);
-            setTimeout(() => {
-              setShowSyncModal(false);
-              setSyncProgress(0);
-            }, 2000);
-          }
-          
-          if (localData.length > 0) {
-            setError('Using local data. Database connection failed.');
-          } else {
-            setError('Failed to load data. Please try again later.');
-          }
-        }
         
       } catch (err) {
         setError('Failed to load dashboard data.');
