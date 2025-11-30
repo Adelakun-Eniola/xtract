@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000') + '/api/scraper';
+const API_URL = 'https://xtracter.onrender.com/api/scraper';
 
 // Debug: Log the API URL being used
 console.log('ScraperService API_URL:', API_URL);
