@@ -74,10 +74,27 @@ const Dashboard = () => {
           
           console.log('Dashboard: Database returned:', serverData.length, 'businesses');
           
-          // Update with server data if it exists, otherwise keep local data
+          // Merge database and localStorage data for complete view
           if (serverData.length > 0) {
-            console.log('Dashboard: Using database data');
-            setData(serverData);
+            console.log('Dashboard: Merging database and local data');
+            
+            // Combine database and local data, removing duplicates
+            const allData = [...serverData];
+            localData.forEach(localItem => {
+              const exists = serverData.find(serverItem => 
+                serverItem.company_name === localItem.company_name && 
+                serverItem.website_url === localItem.website_url
+              );
+              if (!exists) {
+                allData.push(localItem);
+              }
+            });
+            
+            console.log(`Dashboard: Combined ${serverData.length} database + ${localData.length} local = ${allData.length} total`);
+            setData(allData);
+            
+            // Save merged data to localStorage for next time
+            saveDashboardData(allData);
             setStats(serverStats);
             saveDashboardData(serverData);
             if (serverStats) {
