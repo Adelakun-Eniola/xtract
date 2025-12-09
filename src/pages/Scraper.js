@@ -25,6 +25,13 @@ const Scraper = () => {
       return;
     }
     
+    // Check if user is authenticated
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Please log in to use the scraper');
+      return;
+    }
+    
     try {
       setLoading(true);
       setError('');
@@ -64,7 +71,7 @@ const Scraper = () => {
           addExtractedData(extractedItem);
           
           // Trigger dashboard update event
-          window.dispatchEvent(new CustomEvent('dashboardUpdate'));
+          window.dispatchEvent(new CustomEvent('scraperComplete'));
           
         } else if (event.type === 'complete') {
           setSuccess(event.message || `Found ${event.total} businesses`);
@@ -72,7 +79,7 @@ const Scraper = () => {
           setLoading(false);
           
           // Final dashboard update
-          window.dispatchEvent(new CustomEvent('dashboardUpdate'));
+          window.dispatchEvent(new CustomEvent('scraperComplete'));
           
         } else if (event.type === 'error') {
           setError(event.error);
@@ -139,7 +146,7 @@ const Scraper = () => {
             addExtractedData(extractedItem);
             
             // Trigger dashboard update event
-            window.dispatchEvent(new CustomEvent('dashboardUpdate'));
+            window.dispatchEvent(new CustomEvent('scraperComplete'));
             
           } else if (event.type === 'complete') {
             setSuccess(event.message || `Found ${event.total} businesses`);
@@ -147,7 +154,7 @@ const Scraper = () => {
             setLoading(false);
             
             // Final dashboard update
-            window.dispatchEvent(new CustomEvent('dashboardUpdate'));
+            window.dispatchEvent(new CustomEvent('scraperComplete'));
             
           } else if (event.type === 'error') {
             setError(event.error);

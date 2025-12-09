@@ -3,15 +3,6 @@ import { Container, Row, Col, Card, Table, Spinner, Alert, Badge, Toast, ToastCo
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { getUserData, getStats } from '../services/dashboardService';
-import { 
-  getDashboardData, 
-  getDashboardStats, 
-  saveDashboardData, 
-  saveDashboardStats, 
-  getLastSync,
-  migrateDataToUser,
-  ensureDataExists 
-} from '../services/localStorageService';
 
 // Register ChartJS components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -26,37 +17,43 @@ const Dashboard = () => {
   const [syncProgress, setSyncProgress] = useState(0);
   const [syncMessage, setSyncMessage] = useState('');
 
-  // Load data from localStorage first, then sync with server
+  // Load data from MongoDB database
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
+        setError('');
         
-        // Migrate any default data to user-specific keys
-        migrateDataToUser();
+        // Check if user is authenticated
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('Please log in to view your dashboard');
+          setLoading(false);
+          return;
+        }
         
-        // Ensure data exists and load from localStorage
-        const localData = ensureDataExists();
-        const localStats = getDashboardStats();
-        const syncTime = getLastSync();
+        console.log('Dashboard: Loading data from MongoDB database...');
         
-        console.log('Dashboard loading - Local data:', localData.length, 'items');
-        console.log('Dashboard loading - Local stats:', localStats);
+        // Load data from database
+        const [userData, statsData] = await Promise.all([
+          getUserData(),
+          getStats()
+        ]);
         
-        // Always set the data (ensureDataExists guarantees we have data)
-        setData(localData);
-        setStats(localStats);
-        setLastSync(syncTime || new Date());
-        setLoading(false); // Show data immediately
+        console.log('Dashboard: Loaded from database:', userData.data?.length || 0, 'items');
+        console.log('Dashboard: Stats from database:', statsData);
         
-        // Use localStorage only - no database sync
-        console.log('Dashboard: Using localStorage only - no database interference');
-        // Database sync disabled to prevent data loss
-        // Keep using localStorage data permanently
+        setData(userData.data || []);
+        setStats(statsData);
+        setLastSync(new Date());
         
       } catch (err) {
-        setError('Failed to load dashboard data.');
         console.error('Dashboard loading error:', err);
+        if (err.response?.status === 401) {
+          setError('Please log in to view your dashboard');
+        } else {
+          setError('Failed to load dashboard data. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
@@ -64,48 +61,16 @@ const Dashboard = () => {
 
     loadData();
     
-    // Listen for storage events (when data is updated from scraper)
-    const handleStorageChange = (e) => {
-      if (e.key && e.key.includes('dashboard_data')) {
-        const updatedData = getDashboardData();
-        const updatedStats = getDashboardStats();
-        setData(updatedData);
-        setStats(updatedStats);
-        setLastSync(getLastSync());
-        console.log('Dashboard updated from localStorage event');
-      }
+    // Listen for custom events when scraper completes
+    const handleScraperComplete = () => {
+      console.log('Dashboard: Scraper completed, reloading data...');
+      loadData(); // Reload from database
     };
     
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for custom events from the same tab
-    const handleCustomUpdate = () => {
-      const updatedData = getDashboardData();
-      const updatedStats = getDashboardStats();
-      setData(updatedData);
-      setStats(updatedStats);
-      setLastSync(getLastSync());
-      console.log('Dashboard updated from custom event');
-    };
-    
-    window.addEventListener('dashboardUpdate', handleCustomUpdate);
-    
-    // Periodic check to ensure data doesn't disappear
-    const dataCheckInterval = setInterval(() => {
-      const currentData = getDashboardData();
-      if (currentData.length === 0 && data.length > 0) {
-        console.warn('Dashboard: Data disappeared, restoring...');
-        const restoredData = ensureDataExists();
-        const restoredStats = getDashboardStats();
-        setData(restoredData);
-        setStats(restoredStats);
-      }
-    }, 5000); // Check every 5 seconds
+    window.addEventListener('scraperComplete', handleScraperComplete);
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('dashboardUpdate', handleCustomUpdate);
-      clearInterval(dataCheckInterval);
+      window.removeEventListener('scraperComplete', handleScraperComplete);
     };
   }, []);
 
