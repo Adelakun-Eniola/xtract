@@ -378,10 +378,10 @@ export const searchAddressesStream = async (url, onProgress) => {
   }
 };
 
-// Extract data from multiple websites
+// Extract data from multiple websites (legacy endpoint)
 export const batchExtract = async (urls) => {
   try {
-    const response = await axios.post(`${API_URL}/batch`, { urls }, authHeader());
+    const response = await axios.post(`${API_URL}/batch-urls`, { urls }, authHeader());
     return response.data;
   } catch (error) {
     console.error('Batch extraction error:', error);
