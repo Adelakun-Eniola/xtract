@@ -27,6 +27,8 @@ const Login = ({ setIsAuthenticated, setUser }) => {
       
       const freshToken = credentialResponse.credential;
       console.log('Fresh Google Token received at:', new Date().toISOString());
+      console.log('Fresh Google Token body:', freshToken);
+      
       console.log('Token (first 100 chars):', freshToken.substring(0, 100) + '...');
       console.log('Token length:', freshToken.length);
       

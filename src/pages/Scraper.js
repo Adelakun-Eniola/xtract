@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Form, Button, Card, Alert, Spinner, Table, Badge, ProgressBar, ListGroup } from 'react-bootstrap';
-import { extractData, extractDataStream, batchExtract, searchBusinesses, searchBusinessesStream, searchAddressesStream } from '../services/scraperService';
+import { extractData, extractDataStream, batchExtract, searchBusinesses, searchBusinessesStream, runChunkedScraping } from '../services/scraperService';
 import { addExtractedData } from '../services/localStorageService';
 
 const Scraper = () => {
@@ -17,7 +17,8 @@ const Scraper = () => {
   const [businesses, setBusinesses] = useState([]);
   const [showBusinessList, setShowBusinessList] = useState(false);
 
-  const handleSearchAddresses = async (e) => {
+  // NEW: Chunked scraping handler - eliminates timeouts and memory issues
+  const handleChunkedScraping = async (e) => {
     e.preventDefault();
     
     if (!url) {
@@ -39,10 +40,10 @@ const Scraper = () => {
       setBusinesses([]);
       setShowBusinessList(false);
       setProgress({ current: 0, total: 0 });
-      setStatusMessage('Searching for businesses and extracting phone numbers, addresses, websites & emails...');
+      setStatusMessage('Initializing search...');
       
-      await searchAddressesStream(url, (event) => {
-        console.log('Frontend received address event:', event.type, event);
+      await runChunkedScraping(url, (event) => {
+        console.log('Chunked scraping event:', event.type, event);
         
         if (event.type === 'status') {
           setStatusMessage(event.message);
@@ -53,13 +54,20 @@ const Scraper = () => {
         } else if (event.type === 'business') {
           // Add business immediately as it comes in
           const businessData = event.data;
-          setBusinesses(prev => [...prev, businessData]);
+          setBusinesses(prev => [...prev, {
+            index: prev.length + 1,
+            name: businessData.name,
+            phone: businessData.phone,
+            address: businessData.address,
+            website: businessData.website,
+            email: businessData.email
+          }]);
           setProgress(event.progress);
           setStatusMessage(`Extracted ${event.progress.current} of ${event.progress.total} businesses...`);
           
-          // Save to localStorage immediately for real-time dashboard updates
+          // Save to localStorage for dashboard updates
           const extractedItem = {
-            id: Date.now() + Math.random(), // Temporary ID
+            id: Date.now() + Math.random(),
             company_name: businessData.name,
             email: businessData.email || 'N/A',
             phone: businessData.phone || 'N/A',
@@ -69,16 +77,16 @@ const Scraper = () => {
           };
           
           addExtractedData(extractedItem);
-          
-          // Trigger dashboard update event
           window.dispatchEvent(new CustomEvent('scraperComplete'));
+          
+        } else if (event.type === 'progress') {
+          setProgress({ current: event.current, total: event.total });
+          setStatusMessage(event.message);
           
         } else if (event.type === 'complete') {
           setSuccess(event.message || `Found ${event.total} businesses`);
           setStatusMessage('');
           setLoading(false);
-          
-          // Final dashboard update
           window.dispatchEvent(new CustomEvent('scraperComplete'));
           
         } else if (event.type === 'error') {
@@ -88,9 +96,9 @@ const Scraper = () => {
       });
       
     } catch (err) {
-      const errorMsg = err.response?.data?.error || err.message || 'Failed to search addresses. Please check the URL and try again.';
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to scrape businesses. Please check the URL and try again.';
       setError(errorMsg);
-      console.error('Address search error:', err);
+      console.error('Chunked scraping error:', err);
     } finally {
       setLoading(false);
       setStatusMessage('');
@@ -369,10 +377,10 @@ const Scraper = () => {
               
               <Button 
                 variant="success" 
-                onClick={(e) => handleSearchBusinesses(e, true)}
+                onClick={handleChunkedScraping}
                 disabled={loading}
                 className="d-flex align-items-center"
-                title="Extracts phone numbers for all businesses (shows results in real-time)"
+                title="Extracts all details using chunked processing (no timeouts!)"
               >
                 {loading && (
                   <Spinner
@@ -384,15 +392,15 @@ const Scraper = () => {
                     className="me-2"
                   />
                 )}
-                Get Phone Numbers (All)
+                Extract All Details
               </Button>
               
               <Button 
                 variant="info" 
-                onClick={handleSearchAddresses}
+                onClick={handleChunkedScraping}
                 disabled={loading}
                 className="d-flex align-items-center"
-                title="Extracts phone numbers, addresses, websites, and emails for all businesses (shows results in real-time)"
+                title="Extracts phone numbers, addresses, websites, and emails for all businesses (chunked processing - no timeouts!)"
               >
                 {loading && (
                   <Spinner
@@ -404,7 +412,7 @@ const Scraper = () => {
                     className="me-2"
                   />
                 )}
-                Get Complete Details (Phone, Address, Website, Email)
+                Get Complete Details (Recommended)
               </Button>
             </div>
           </Form>

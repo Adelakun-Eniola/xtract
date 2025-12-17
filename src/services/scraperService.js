@@ -16,6 +16,142 @@ const authHeader = () => {
   return {};
 };
 
+// ============================================
+// NEW CHUNKED SCRAPING API (Recommended)
+// ============================================
+
+/**
+ * Initialize a scraping job - finds all businesses and returns a job_id
+ * @param {string} url - Google Maps search URL
+ * @returns {Promise<{job_id: string, total_items: number}>}
+ */
+export const initScrapeJob = async (url) => {
+  if (!/^https?:\/\//i.test(url)) {
+    url = "https://" + url;
+  }
+  try {
+    const response = await axios.post(`${API_URL}/init`, { url }, authHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Init job error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Process a batch of businesses for a job
+ * @param {string} jobId - The job ID from initScrapeJob
+ * @param {number} limit - Number of businesses to process (default: 5)
+ * @returns {Promise<{results: Array, processed: number, total: number, completed: boolean}>}
+ */
+export const processBatch = async (jobId, limit = 5) => {
+  try {
+    const response = await axios.post(`${API_URL}/batch`, { job_id: jobId, limit }, authHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Batch processing error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Run chunked scraping with progress callback
+ * This is the main function to use for scraping - handles the full flow
+ * @param {string} url - Google Maps search URL
+ * @param {function} onProgress - Callback for progress updates
+ * @returns {Promise<{results: Array, total: number}>}
+ */
+export const runChunkedScraping = async (url, onProgress) => {
+  try {
+    // Step 1: Initialize the job
+    if (onProgress) {
+      onProgress({ type: 'status', message: 'Initializing search...' });
+    }
+    
+    const initResult = await initScrapeJob(url);
+    const { job_id, total_items } = initResult;
+    
+    if (onProgress) {
+      onProgress({ 
+        type: 'status', 
+        message: `Found ${total_items} businesses. Starting extraction...`,
+        total: total_items 
+      });
+    }
+    
+    // Step 2: Process batches until complete
+    let allResults = [];
+    let completed = false;
+    let processed = 0;
+    
+    while (!completed) {
+      const batchResult = await processBatch(job_id, 5);
+      
+      // Add results
+      if (batchResult.results && batchResult.results.length > 0) {
+        allResults = [...allResults, ...batchResult.results];
+        
+        // Send each business to progress callback
+        for (const business of batchResult.results) {
+          if (onProgress) {
+            onProgress({
+              type: 'business',
+              data: {
+                name: business.company_name,
+                phone: business.phone || 'N/A',
+                address: business.address || 'N/A',
+                website: business.website_url || 'N/A',
+                email: business.email || 'N/A'
+              },
+              progress: {
+                current: batchResult.processed,
+                total: batchResult.total
+              }
+            });
+          }
+        }
+      }
+      
+      processed = batchResult.processed;
+      completed = batchResult.completed;
+      
+      if (onProgress) {
+        onProgress({
+          type: 'progress',
+          message: `Processed ${processed} of ${total_items} businesses...`,
+          current: processed,
+          total: total_items
+        });
+      }
+      
+      // Small delay between batches to prevent overwhelming the server
+      if (!completed) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    
+    // Step 3: Complete
+    if (onProgress) {
+      onProgress({
+        type: 'complete',
+        message: `Completed! Extracted ${allResults.length} businesses`,
+        total: allResults.length
+      });
+    }
+    
+    return { results: allResults, total: allResults.length };
+    
+  } catch (error) {
+    if (onProgress) {
+      onProgress({
+        type: 'error',
+        error: error.response?.data?.error || error.message || 'Failed to scrape businesses'
+      });
+    }
+    throw error;
+  }
+};
+
 // Extract data from a single website or Google Maps search URL
 export const extractData = async (url) => {
   if (!/^https?:\/\//i.test(url)) {
