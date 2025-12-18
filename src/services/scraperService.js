@@ -45,12 +45,12 @@ export const initScrapeJob = async (url) => {
  * @param {boolean} skipEmail - Skip email extraction (faster, less memory)
  * @returns {Promise<{results: Array, processed: number, total: number, completed: boolean}>}
  */
-export const processBatch = async (jobId, limit = 2, skipEmail = false) => {
+export const processBatch = async (jobId, limit = 1, skipEmail = false) => {
   try {
     const response = await axios.post(`${API_URL}/batch`, { 
       job_id: jobId, 
       limit,
-      skip_email: skipEmail  // Extract emails by default
+      skip_email: skipEmail  // Extract email by default
     }, authHeader());
     return response.data;
   } catch (error) {
@@ -90,7 +90,7 @@ export const runChunkedScraping = async (url, onProgress) => {
     let processed = 0;
     
     while (!completed) {
-      const batchResult = await processBatch(job_id, 2, false);  // 2 businesses, extract email
+      const batchResult = await processBatch(job_id, 1, false);  // 1 business at a time, extract email
       
       // Add results
       if (batchResult.results && batchResult.results.length > 0) {
