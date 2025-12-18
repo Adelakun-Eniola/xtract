@@ -41,12 +41,17 @@ export const initScrapeJob = async (url) => {
 /**
  * Process a batch of businesses for a job
  * @param {string} jobId - The job ID from initScrapeJob
- * @param {number} limit - Number of businesses to process (default: 5)
+ * @param {number} limit - Number of businesses to process (default: 2 for memory optimization)
+ * @param {boolean} skipEmail - Skip email extraction (faster, less memory)
  * @returns {Promise<{results: Array, processed: number, total: number, completed: boolean}>}
  */
-export const processBatch = async (jobId, limit = 5) => {
+export const processBatch = async (jobId, limit = 2, skipEmail = true) => {
   try {
-    const response = await axios.post(`${API_URL}/batch`, { job_id: jobId, limit }, authHeader());
+    const response = await axios.post(`${API_URL}/batch`, { 
+      job_id: jobId, 
+      limit,
+      skip_email: skipEmail  // Skip email by default - it's slow and causes memory issues
+    }, authHeader());
     return response.data;
   } catch (error) {
     console.error("Batch processing error:", error);
@@ -79,13 +84,13 @@ export const runChunkedScraping = async (url, onProgress) => {
       });
     }
     
-    // Step 2: Process batches until complete
+    // Step 2: Process batches until complete (2 at a time for memory optimization)
     let allResults = [];
     let completed = false;
     let processed = 0;
     
     while (!completed) {
-      const batchResult = await processBatch(job_id, 5);
+      const batchResult = await processBatch(job_id, 2, true);  // 2 businesses, skip email
       
       // Add results
       if (batchResult.results && batchResult.results.length > 0) {
