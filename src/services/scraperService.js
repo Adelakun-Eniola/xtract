@@ -64,7 +64,7 @@ export const processBatch = async (jobId, limit = 1, skipEmail = false) => {
  * This is the main function to use for scraping - handles the full flow
  * @param {string} url - Google Maps search URL
  * @param {function} onProgress - Callback for progress updates
- * @returns {Promise<{results: Array, total: number}>}
+ * @returns {Promise<{results: Array, total: number, job_id: string}>}
  */
 export const runChunkedScraping = async (url, onProgress) => {
   try {
@@ -80,7 +80,8 @@ export const runChunkedScraping = async (url, onProgress) => {
       onProgress({ 
         type: 'status', 
         message: `Found ${total_items} businesses. Starting extraction...`,
-        total: total_items 
+        total: total_items,
+        job_id: job_id
       });
     }
     
@@ -111,7 +112,8 @@ export const runChunkedScraping = async (url, onProgress) => {
               progress: {
                 current: batchResult.processed,
                 total: batchResult.total
-              }
+              },
+              job_id: job_id
             });
           }
         }
@@ -125,7 +127,8 @@ export const runChunkedScraping = async (url, onProgress) => {
           type: 'progress',
           message: `Processed ${processed} of ${total_items} businesses...`,
           current: processed,
-          total: total_items
+          total: total_items,
+          job_id: job_id
         });
       }
       
@@ -140,11 +143,12 @@ export const runChunkedScraping = async (url, onProgress) => {
       onProgress({
         type: 'complete',
         message: `Completed! Extracted ${allResults.length} businesses`,
-        total: allResults.length
+        total: allResults.length,
+        job_id: job_id
       });
     }
     
-    return { results: allResults, total: allResults.length };
+    return { results: allResults, total: allResults.length, job_id: job_id };
     
   } catch (error) {
     if (onProgress) {
@@ -390,6 +394,60 @@ export const batchExtract = async (urls) => {
     return response.data;
   } catch (error) {
     console.error('Batch extraction error:', error);
+    throw error;
+  }
+};
+
+// ============================================
+// CSV EXPORT FUNCTION
+// ============================================
+
+/**
+ * Export job results to CSV file
+ * Downloads a CSV file with UTF-8 BOM encoding for Excel compatibility
+ * @param {string} jobId - The job ID to export
+ * @returns {Promise<void>}
+ */
+export const exportJobToCSV = async (jobId) => {
+  const token = localStorage.getItem('token');
+  const apiUrl = `${API_URL}/export/${jobId}`;
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+    
+    // Get the blob from response
+    const blob = await response.blob();
+    
+    // Create a temporary URL for the blob
+    const url = window.URL.createObjectURL(blob);
+    
+    // Create a temporary anchor element
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `leads-${jobId}.csv`;
+    
+    // Append to body, click, and remove
+    document.body.appendChild(a);
+    a.click();
+    
+    // Cleanup
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    return true;
+  } catch (error) {
+    console.error('CSV export error:', error);
     throw error;
   }
 };

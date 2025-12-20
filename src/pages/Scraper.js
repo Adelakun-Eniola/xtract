@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Container, Form, Button, Card, Alert, Spinner, Table, Badge, ProgressBar, ListGroup } from 'react-bootstrap';
-import { extractData, extractDataStream, batchExtract, searchBusinesses, searchBusinessesStream, runChunkedScraping } from '../services/scraperService';
+import { extractData, extractDataStream, batchExtract, searchBusinesses, searchBusinessesStream, runChunkedScraping, exportJobToCSV } from '../services/scraperService';
 import { addExtractedData } from '../services/localStorageService';
 
 const Scraper = () => {
   const [url, setUrl] = useState('');
   const [urls, setUrls] = useState('');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [results, setResults] = useState([]);
@@ -16,6 +17,26 @@ const Scraper = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [businesses, setBusinesses] = useState([]);
   const [showBusinessList, setShowBusinessList] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState(null);
+
+  // Export to CSV handler
+  const handleExportCSV = async () => {
+    if (!currentJobId) {
+      setError('No job to export. Please run a scrape first.');
+      return;
+    }
+    
+    try {
+      setExporting(true);
+      setError('');
+      await exportJobToCSV(currentJobId);
+      setSuccess('CSV exported successfully!');
+    } catch (err) {
+      setError(err.message || 'Failed to export CSV');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // NEW: Chunked scraping handler - eliminates timeouts and memory issues
   const handleChunkedScraping = async (e) => {
@@ -41,9 +62,15 @@ const Scraper = () => {
       setShowBusinessList(false);
       setProgress({ current: 0, total: 0 });
       setStatusMessage('Initializing search...');
+      setCurrentJobId(null);
       
       await runChunkedScraping(url, (event) => {
         console.log('Chunked scraping event:', event.type, event);
+        
+        // Track job_id from any event that has it
+        if (event.job_id) {
+          setCurrentJobId(event.job_id);
+        }
         
         if (event.type === 'status') {
           setStatusMessage(event.message);
@@ -423,7 +450,25 @@ const Scraper = () => {
         <Card className="mb-4">
           <Card.Header className="d-flex justify-content-between align-items-center">
             <h5 className="mb-0">Found {businesses.length} Businesses</h5>
-            <Badge bg="success">{businesses.length} results</Badge>
+            <div className="d-flex align-items-center gap-2">
+              <Badge bg="success">{businesses.length} results</Badge>
+              {currentJobId && !loading && (
+                <Button 
+                  variant="success" 
+                  size="sm"
+                  onClick={handleExportCSV}
+                  disabled={exporting}
+                  className="d-flex align-items-center"
+                >
+                  {exporting ? (
+                    <Spinner animation="border" size="sm" className="me-1" />
+                  ) : (
+                    <span className="me-1">📥</span>
+                  )}
+                  Export to CSV
+                </Button>
+              )}
+            </div>
           </Card.Header>
           <Card.Body>
             <ListGroup>
