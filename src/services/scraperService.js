@@ -39,22 +39,38 @@ export const initScrapeJob = async (url) => {
 };
 
 /**
- * Process a batch of businesses for a job
+ * Process a batch of businesses for a job with retry logic
  * @param {string} jobId - The job ID from initScrapeJob
- * @param {number} limit - Number of businesses to process (default: 2 for memory optimization)
+ * @param {number} limit - Number of businesses to process (default: 1 for memory optimization)
  * @param {boolean} skipEmail - Skip email extraction (faster, less memory)
+ * @param {number} retryCount - Internal retry counter
  * @returns {Promise<{results: Array, processed: number, total: number, completed: boolean}>}
  */
-export const processBatch = async (jobId, limit = 1, skipEmail = false) => {
+export const processBatch = async (jobId, limit = 1, skipEmail = false, retryCount = 0) => {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [2000, 5000, 10000]; // Exponential backoff: 2s, 5s, 10s
+  
   try {
     const response = await axios.post(`${API_URL}/batch`, { 
       job_id: jobId, 
       limit,
-      skip_email: skipEmail  // Extract email by default
+      skip_email: skipEmail
     }, authHeader());
     return response.data;
   } catch (error) {
-    console.error("Batch processing error:", error);
+    const status = error.response?.status;
+    const isRetryable = status === 502 || status === 503 || status === 504 || error.code === 'ERR_NETWORK';
+    
+    console.error(`Batch processing error (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error.message);
+    
+    // Retry on server errors (502, 503, 504) or network errors
+    if (isRetryable && retryCount < MAX_RETRIES) {
+      const delay = RETRY_DELAYS[retryCount] || 10000;
+      console.log(`Retrying in ${delay/1000}s... (server may be recovering)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return processBatch(jobId, limit, skipEmail, retryCount + 1);
+    }
+    
     throw error;
   }
 };
@@ -62,6 +78,7 @@ export const processBatch = async (jobId, limit = 1, skipEmail = false) => {
 /**
  * Run chunked scraping with progress callback
  * This is the main function to use for scraping - handles the full flow
+ * Includes retry logic for server crashes (502 errors)
  * @param {string} url - Google Maps search URL
  * @param {function} onProgress - Callback for progress updates
  * @returns {Promise<{results: Array, total: number, job_id: string}>}
@@ -85,61 +102,92 @@ export const runChunkedScraping = async (url, onProgress) => {
       });
     }
     
-    // Step 2: Process batches until complete (2 at a time for memory optimization)
+    // Step 2: Process batches until complete (1 at a time for memory optimization)
     let allResults = [];
     let completed = false;
     let processed = 0;
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 5;
     
-    while (!completed) {
-      const batchResult = await processBatch(job_id, 1, false);  // 1 business at a time, extract email
-      
-      // Add results
-      if (batchResult.results && batchResult.results.length > 0) {
-        allResults = [...allResults, ...batchResult.results];
+    while (!completed && consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+      try {
+        const batchResult = await processBatch(job_id, 1, false);  // 1 business at a time, extract email
+        consecutiveErrors = 0; // Reset on success
         
-        // Send each business to progress callback
-        for (const business of batchResult.results) {
-          if (onProgress) {
-            onProgress({
-              type: 'business',
-              data: {
-                name: business.company_name,
-                phone: business.phone || 'N/A',
-                address: business.address || 'N/A',
-                website: business.website_url || 'N/A',
-                email: business.email || 'N/A'
-              },
-              progress: {
-                current: batchResult.processed,
-                total: batchResult.total
-              },
-              job_id: job_id
-            });
+        // Add results
+        if (batchResult.results && batchResult.results.length > 0) {
+          allResults = [...allResults, ...batchResult.results];
+          
+          // Send each business to progress callback
+          for (const business of batchResult.results) {
+            if (onProgress) {
+              onProgress({
+                type: 'business',
+                data: {
+                  name: business.company_name,
+                  phone: business.phone || 'N/A',
+                  address: business.address || 'N/A',
+                  website: business.website_url || 'N/A',
+                  email: business.email || 'N/A'
+                },
+                progress: {
+                  current: batchResult.processed,
+                  total: batchResult.total
+                },
+                job_id: job_id
+              });
+            }
           }
         }
-      }
-      
-      processed = batchResult.processed;
-      completed = batchResult.completed;
-      
-      if (onProgress) {
-        onProgress({
-          type: 'progress',
-          message: `Processed ${processed} of ${total_items} businesses...`,
-          current: processed,
-          total: total_items,
-          job_id: job_id
-        });
-      }
-      
-      // Small delay between batches to prevent overwhelming the server
-      if (!completed) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        processed = batchResult.processed;
+        completed = batchResult.completed;
+        
+        if (onProgress) {
+          onProgress({
+            type: 'progress',
+            message: `Processed ${processed} of ${total_items} businesses...`,
+            current: processed,
+            total: total_items,
+            job_id: job_id
+          });
+        }
+        
+        // Small delay between batches to let server recover
+        if (!completed) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+      } catch (batchError) {
+        consecutiveErrors++;
+        console.error(`Batch error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, batchError.message);
+        
+        if (onProgress) {
+          onProgress({
+            type: 'status',
+            message: `Server recovering... Retrying (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS})`,
+            current: processed,
+            total: total_items,
+            job_id: job_id
+          });
+        }
+        
+        // Wait longer before retrying after an error
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
     
-    // Step 3: Complete
-    if (onProgress) {
+    // Step 3: Complete (or stopped due to errors)
+    if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+      if (onProgress) {
+        onProgress({
+          type: 'complete',
+          message: `Partially completed. Extracted ${allResults.length} of ${total_items} businesses (server issues).`,
+          total: allResults.length,
+          job_id: job_id
+        });
+      }
+    } else if (onProgress) {
       onProgress({
         type: 'complete',
         message: `Completed! Extracted ${allResults.length} businesses`,
